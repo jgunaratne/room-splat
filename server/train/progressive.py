@@ -157,7 +157,9 @@ class ProgressiveTrainer:
         done = 0
         batch = 200
         while done < iters and (time.monotonic() - t) < max_seconds:
-            self.backend.step(min(batch, iters - done))
+            # live=False: all keyframes are present now, so sample views uniformly rather
+            # than biasing the last 20 (see GsplatTrainer._sample_cam).
+            self.backend.step(min(batch, iters - done), live=False)
             done += batch
         log.info("stage=finish_train session=%s iters=%d splats=%d wall_s=%.1f",
                  self.manifest.session_id, done, len(self.backend.cloud()), time.monotonic() - t)
