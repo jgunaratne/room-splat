@@ -14,6 +14,7 @@
       #hud b { color: #fff; }
       #hud button { font: inherit; margin-top: 6px; cursor: pointer; }
       #hud .hint { color: #7f8792; margin-top: 6px; }
+      #lidarOpts { margin-top: 6px; display: flex; gap: 4px; }
       #projectRow { margin-top: 6px; display: flex; gap: 4px; align-items: center; }
       #projectRow select { font: inherit; max-width: 190px; }
       .warn { color: #ffb454; }
@@ -72,6 +73,10 @@
         <button id="save">save project</button>
         <select id="projects"><option value="">— saved projects —</option></select>
         <button id="load">load</button>
+      </div>
+      <div id="lidarOpts" style="display:none;">
+        <button id="toggleTex">texture: on</button>
+        <button id="toggleWire">wireframe: off</button>
       </div>
       <div class="hint">click to look · WASD move · Space/Ctrl up·down · Shift boost · wheel zoom · Esc release</div>
     </div>
