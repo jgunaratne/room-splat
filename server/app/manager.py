@@ -174,6 +174,10 @@ class SessionManager:
         rt = self.sessions.get(session_id)
         if not rt:
             return
+        # Idempotent: a duplicate session_complete/abort (or a disconnect after complete)
+        # must not run the expensive finishing pass twice.
+        if rt.session.is_complete:
+            return
         rt.session.complete()
         await rt.stop()
         # Finishing pass (SPEC.md M6): train much longer than a live tick, then re-export
