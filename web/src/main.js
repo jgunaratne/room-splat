@@ -17,6 +17,12 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
+// Make the canvas keyboard-focusable and give it focus so WASD is received without
+// needing to click first (a click also focuses it).
+renderer.domElement.tabIndex = 0;
+renderer.domElement.style.outline = "none";
+renderer.domElement.focus();
+renderer.domElement.addEventListener("pointerdown", () => renderer.domElement.focus());
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -236,13 +242,15 @@ addEventListener("resize", () => {
 function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
-  if (mode === "follow" && followTarget) {
+  const flying = keys.size > 0;
+  // Apply WASD first, always, so it works regardless of mode/session state.
+  applyFlyMovement(dt);
+  if (mode === "follow" && followTarget && !flying) {
     // Ease the browser camera toward the operator so the screen shows what's scanned.
     const desired = followTarget.clone().add(new THREE.Vector3(0, 1.5, 3));
     camera.position.lerp(desired, 0.05);
     camera.lookAt(followTarget);
   } else {
-    applyFlyMovement(dt);
     controls.update();
   }
   renderer.render(scene, camera);
