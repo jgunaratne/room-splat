@@ -95,7 +95,9 @@ class LiveSession:
             self.package.update_capture(frames_dropped=self.stats.frames_dropped)
             return None
         file_path = self.package.append_keyframe(frame_index, jpeg, meta.transform_matrix)
-        self.latest_jpeg = jpeg
+        # Note: keyframes are native landscape (kept that way for training, §5). The PiP
+        # is fed by the orientation-corrected preview stream instead, so we do NOT set
+        # latest_jpeg here — that keeps the PiP upright and from flipping between frames.
         self.latest_frame_index = frame_index
         self.live_seq += 1
         self._written.add(frame_index)
