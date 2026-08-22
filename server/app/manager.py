@@ -96,6 +96,10 @@ class SessionManager:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.assets_dir.mkdir(parents=True, exist_ok=True)
         self.backend_name = backend_name or os.environ.get("ROOMSPLAT_BACKEND", "synthetic")
+        # Iterations for the session-end finishing pass (SPEC.md M6). ~7k is a good
+        # quality/latency trade on the 5090; the synthetic backend ignores the count.
+        self.finish_iters = int(os.environ.get("ROOMSPLAT_FINISH_ITERS", "7000"))
+        self.finish_seconds = float(os.environ.get("ROOMSPLAT_FINISH_SECONDS", "60"))
         self.sessions: dict[str, SessionRuntime] = {}
         self.viewers: set[Any] = set()
 
@@ -162,9 +166,11 @@ class SessionManager:
             return
         rt.session.complete()
         await rt.stop()
-        # final tick to flush any remaining dirty cells
+        # Finishing pass (SPEC.md M6): train much longer than a live tick, then re-export
+        # every cell at final quality. This is what turns the progressive preview into
+        # the deliverable. Runs off the event loop so viewers stay responsive.
         if rt.trainer is not None:
-            diff = rt.trainer.tick()
+            diff = await asyncio.to_thread(rt.trainer.finish, self.finish_iters, self.finish_seconds)
             await self.broadcast(diff)
         await self.broadcast({"type": "session_complete", "session_id": session_id})
         log.info("stage=session_complete session=%s frames=%d",
