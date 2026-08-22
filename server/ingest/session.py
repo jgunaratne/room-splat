@@ -45,6 +45,7 @@ class LiveSession:
         self.point_cloud: tuple[np.ndarray, np.ndarray] | None = None
         # frame_index -> pose, populated by keyframe_meta and consumed by the image
         self._pending_meta: dict[int, KeyframeMeta] = {}
+        self._written: set[int] = set()
         self._highest_ack = -1
         self._complete = False
 
@@ -74,7 +75,12 @@ class LiveSession:
 
         Returns the written file_path, or None if the pose never arrived (a dropped
         keyframe_meta — logged, not fatal; the stream is lossy by design, §4).
+
+        Idempotent: a frame_index already mirrored (e.g. re-sent after a reconnect) is
+        skipped, so resume never duplicates or double-counts (§4).
         """
+        if frame_index in self._written:
+            return None
         meta = self._pending_meta.pop(frame_index, None)
         if meta is None:
             self.stats.frames_dropped += 1
@@ -82,6 +88,7 @@ class LiveSession:
             self.package.update_capture(frames_dropped=self.stats.frames_dropped)
             return None
         file_path = self.package.append_keyframe(frame_index, jpeg, meta.transform_matrix)
+        self._written.add(frame_index)
         self.stats.frame_count += 1
         self._highest_ack = max(self._highest_ack, frame_index)
         self.package.update_capture(frame_count=self.stats.frame_count)

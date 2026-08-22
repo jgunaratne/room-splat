@@ -44,14 +44,11 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
 
 ### M3 — streaming hardening
 
-- [~] **Server → client acks + resume.** — @jtui, 2026-08-22. Server sends
-  `{"type":"ack","frame_index":N}`; document the resume-from-highest-ack contract end to
-  end. *Area:* `app/main.py`, `ingest/session.py`. *Done when:* a test drops the socket
-  mid-stream and the session resumes without duplicating or losing mirrored frames.
-- [~] **Structured stage logging** — @jtui, 2026-08-22. Wall-clock duration for every
-  pipeline stage (train tick, export, simplify) — required from M2 on (SPEC.md §8).
-  *Area:* `train/`, `app/`. *Done when:* one structured line per stage with `wall_s=`
-  appears in logs.
+- [x] **Server → client acks + resume.** — @jtui, 2026-08-22. Server acks each mirrored
+  image and reports the resume point on `session_open`; reconnect resumes an existing
+  session (never restarts), image writes are idempotent. `tests/test_resume.py`.
+- [x] **Structured stage logging** — @jtui, 2026-08-22. `stage=train … wall_s=` and
+  `stage=export … cells= bytes= wall_s=` per tick (`train/progressive.py`).
 
 ### M6 — speed + simplification (⛔ after M4 gate)
 

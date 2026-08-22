@@ -125,6 +125,13 @@ class SessionManager:
 
     async def open_session(self, msg: dict) -> SessionRuntime:
         session_id = msg["session_id"]
+        # Reconnect resumes, never restarts (SPEC.md §4): if a live session with this id
+        # already exists, hand it back so the client resumes from its highest ack.
+        existing = self.sessions.get(session_id)
+        if existing is not None and not existing.session.is_complete:
+            log.info("stage=session_resume session=%s highest_ack=%d",
+                     session_id, existing.session.highest_ack)
+            return existing
         cam = msg["camera"]
         camera = CameraModel.from_dict(cam)
         capture = msg.get("capture", {})

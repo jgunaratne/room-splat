@@ -9,6 +9,7 @@ training is never restarted.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,8 @@ from roomsplat.manifest import CellEntry, Manifest
 
 from .backends import Backend
 from .export import export_cell_ply, write_point_cloud_bin
+
+log = logging.getLogger("roomsplat.train")
 
 TICK_SECONDS = 2.0
 EXPORT_BUDGET_BYTES = 1_500_000  # ~1.5 MB/tick (§4)
@@ -102,8 +105,16 @@ class ProgressiveTrainer:
         return cov
 
     def tick(self, iters: int = 200) -> dict:
-        """Advance training and export dirty cells. Returns a manifest diff dict."""
+        """Advance training and export dirty cells. Returns a manifest diff dict.
+
+        Emits one structured line per stage with wall-clock duration (SPEC.md §8): you
+        cannot optimize M6 without this history.
+        """
+        t = time.monotonic()
         self.backend.step(iters)
+        train_s = time.monotonic() - t
+
+        t = time.monotonic()
         self._score_dirty()
         self.manifest.coverage = self._coverage()
         selected = self.chunker.select_for_export(EXPORT_BUDGET_BYTES)
@@ -111,6 +122,7 @@ class ProgressiveTrainer:
         idx = self.chunker.assign(cloud.means)
         keys = np.array([f"{a}_{b}_{c}" for a, b, c in idx])
         changed: list[CellEntry] = []
+        exported_bytes = 0
         for cell in selected:
             mask = keys == f"{cell.index[0]}_{cell.index[1]}_{cell.index[2]}"
             cell.splats = int(np.count_nonzero(mask))
@@ -119,7 +131,16 @@ class ProgressiveTrainer:
             self.chunker.mark_exported(cell)
             entry = self.manifest.apply_cell(cell)
             name = entry.url.rsplit("/", 1)[-1]
-            export_cell_ply(self.assets_dir / "cells" / name, cloud.subset(mask))
+            exported_bytes += export_cell_ply(self.assets_dir / "cells" / name, cloud.subset(mask))
             changed.append(entry)
+        export_s = time.monotonic() - t
         self._last_tick = time.monotonic()
+        log.info(
+            "stage=train session=%s iters=%d splats=%d wall_s=%.2f",
+            self.manifest.session_id, iters, len(cloud), train_s,
+        )
+        log.info(
+            "stage=export session=%s tick=%d cells=%d bytes=%d wall_s=%.2f",
+            self.manifest.session_id, self.manifest.tick + 1, len(changed), exported_bytes, export_s,
+        )
         return self.manifest.diff(changed)
