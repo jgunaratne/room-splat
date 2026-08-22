@@ -24,6 +24,7 @@ class ControlType(str, Enum):
     KEYFRAME_META = "keyframe_meta"
     CAPABILITY_REPORT = "capability_report"
     THERMAL_STATE = "thermal_state"
+    TRACKING_WARNING = "tracking_warning"
     SESSION_COMPLETE = "session_complete"
     SESSION_ABORT = "session_abort"
     # server -> phone

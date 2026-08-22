@@ -52,3 +52,44 @@ def test_ingest_lands_package_and_notifies_viewer(tmp_path):
     pkg.validate()
     assert len(pkg.frames) == 6
     assert pkg.capture["source"] == "stream"
+
+
+def test_ingest_records_camera_locks_and_tracking_warnings(tmp_path):
+    manager = SessionManager(tmp_path / "captures", tmp_path / "assets", backend_name="synthetic")
+    app = create_app(manager)
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws/ingest") as ingest:
+        ingest.send_text(json.dumps({
+            "type": "session_open",
+            "session_id": "lock-uuid",
+            "device_model": "iPhone17,2",
+            "captured_at": "2026-08-22T10:14:00Z",
+            "exposure_locked": True,
+            "white_balance_locked": True,
+            "tracking_warnings": [],
+            "camera": {"camera_model": "OPENCV", "fl_x": 1400, "fl_y": 1400,
+                       "cx": 800, "cy": 600, "w": 1600, "h": 1200},
+        }))
+        ingest.send_bytes(encode_binary(POINT_CLOUD_FRAME_INDEX, _cloud_bytes(tmp_path)))
+
+        # Simulate a tracking warning sent mid-session (e.g. exposure lock lost)
+        ingest.send_text(json.dumps({
+            "type": "tracking_warning",
+            "message": "Exposure lock lost during capture",
+        }))
+
+        from tests.conftest import _tiny_jpeg
+        pose = np.eye(4)
+        ingest.send_text(json.dumps({
+            "type": "keyframe_meta", "frame_index": 0,
+            "transform_matrix": pose.tolist(), "timestamp": 0.0,
+        }))
+        ingest.send_bytes(encode_binary(0, _tiny_jpeg()))
+        ingest.send_text(json.dumps({"type": "session_complete", "session_id": "lock-uuid"}))
+
+    pkg = RoomSplatPackage.open(tmp_path / "captures" / "lock-uuid.roomsplat")
+    pkg.validate()
+    assert pkg.capture["exposure_locked"] is True
+    assert pkg.capture["white_balance_locked"] is True
+    assert "Exposure lock lost during capture" in pkg.capture.get("tracking_warnings", [])

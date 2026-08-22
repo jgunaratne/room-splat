@@ -109,9 +109,10 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
   planar low-texture regions, resend cloud every 50 keyframes; never transmit per-frame
   depth. *Area:* `Capture/PointCloudFuser.swift`. *Done when:* fused cloud matches §3
   params and streams incrementally.
-- [ ] **Camera locks:** lock exposure + white balance, fixed focus; assert every frame;
+- [x] **Camera locks:** lock exposure + white balance, fixed focus; assert every frame;
   record a warning in session metadata if a lock is lost. *Area:* `Capture/`. *Done when:*
   locks are applied pre-session and `tracking_warnings` records losses.
+  — @antigravity, 2026-08-22
 - [ ] **Debug record-to-disk `.roomsplat` writer (M1 gate).** Writes the §6 package with
   no network, exportable via the Files app. *Area:* new `Capture/PackageWriter.swift`.
   *Done when:* the package validates against `roomsplat/package.py` and `points3D.ply`

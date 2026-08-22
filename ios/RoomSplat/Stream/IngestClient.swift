@@ -16,6 +16,7 @@ enum IngestControl: String, Encodable {
     case keyframeMeta = "keyframe_meta"
     case capabilityReport = "capability_report"
     case thermalState = "thermal_state"
+    case trackingWarning = "tracking_warning"
     case sessionComplete = "session_complete"
     case sessionAbort = "session_abort"
 }

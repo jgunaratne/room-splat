@@ -113,6 +113,8 @@ async def _handle_control(mgr: SessionManager, ws: WebSocket, msg: dict, current
         rt.on_keyframe_pose(meta.transform_matrix)
     elif mtype == ControlType.THERMAL_STATE:
         session.on_thermal_state(float(msg.get("t", 0.0)), str(msg.get("state", "")))
+    elif mtype == ControlType.TRACKING_WARNING:
+        session.on_tracking_warning(str(msg.get("message", "")))
     elif mtype == ControlType.CAPABILITY_REPORT:
         log.info("stage=capability session=%s report=%s", current, msg)
     elif mtype == ControlType.SESSION_COMPLETE:
