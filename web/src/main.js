@@ -119,11 +119,13 @@ function setTab(t) {
   const splat = t === "splat";
   cells.setVisible(splat);
   coverage.setEnabled(splat && coverageOn);
-  roomMesh.setVisible(!splat);
+  // The LiDAR wireframe stays visible in both tabs: on the splat tab it is a live
+  // scaffold that the splats fill in; on the LiDAR tab it is the room itself.
+  roomMesh.setVisible(true);
   // In LiDAR mode the point cloud IS the room, so make it denser-looking; in splat mode
   // it's just the under-layer, kept fine.
   cloud.setPointSize(splat ? 0.015 : 0.03);
-  if (!splat && roomMeshInfo) {
+  if (roomMeshInfo) {
     roomMesh.update(roomMeshInfo.url, roomMeshInfo.version).then((info) => {
       if (info) logLine(`LiDAR room mesh: ${info.triangles.toLocaleString()} triangles`);
     });
@@ -354,11 +356,10 @@ function connect() {
         url: `${base}?v=${msg.version}`,
         version: msg.version,
       };
-      if (tab === "lidar") {
-        roomMesh.update(roomMeshInfo.url, roomMeshInfo.version).then((info) => {
-          if (info) logLine(`LiDAR room mesh: ${info.triangles.toLocaleString()} triangles`);
-        });
-      }
+      // Update live in either tab so the wireframe fills out as the phone scans.
+      roomMesh.update(roomMeshInfo.url, roomMeshInfo.version).then((info) => {
+        if (info) logLine(`LiDAR room mesh: ${info.triangles.toLocaleString()} triangles`);
+      });
     } else if (msg.type === "projects") {
       refreshProjects();
     } else if (msg.type === "log") {
