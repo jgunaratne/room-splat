@@ -62,6 +62,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private var sessionOpened = false
     private var minKeyframeInterval: TimeInterval = 0
     private var lastKeyframeTime: TimeInterval = 0
+    private var lastError: String?
     private let queue = DispatchQueue(label: "roomsplat.capture")
 
     override init() {
@@ -110,6 +111,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
             client.onTransmit = { [weak self] ok in
                 self?.queue.async { self?.handleTransmit(ok) }
             }
+            client.onError = { [weak self] message in
+                self?.queue.async { self?.handleError(message) }
+            }
             client.connect()
             self.ingest = client
         }
@@ -147,22 +151,35 @@ final class CaptureCoordinator: NSObject, ObservableObject {
 
     private func handleConnection(_ up: Bool) {
         guard isCapturingNow else { return }
+        if up { lastError = nil }
+        let detail = lastError.map { " (\($0))" } ?? ""
         publish {
             switch self.link {
             case .transmitting where up:
                 break
             default:
                 self.link = up ? .connected : .connecting
-                self.status = up ? "Connected, waiting for frames…" : "Reconnecting…"
+                self.status = up ? "Connected, waiting for frames…" : "Reconnecting…\(detail)"
             }
         }
     }
 
     private func handleTransmit(_ ok: Bool) {
         guard isCapturingNow else { return }
+        if ok { lastError = nil }
+        let detail = lastError.map { ": \($0)" } ?? ""
         publish {
             self.link = ok ? .transmitting : .error
-            self.status = ok ? "Transmitting" : "Send failed"
+            self.status = ok ? "Transmitting" : "Send failed\(detail)"
+        }
+    }
+
+    private func handleError(_ message: String) {
+        guard isCapturingNow else { return }
+        lastError = message
+        publish {
+            self.link = .error
+            self.status = "Link error: \(message)"
         }
     }
 
