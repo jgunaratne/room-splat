@@ -88,6 +88,12 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private static let previewLongEdge: CGFloat = 640
     private static let previewInterval: TimeInterval = 0.25  // ~4 fps
     private var lastPreviewTime: TimeInterval = 0
+    // Rotation to make the preview upright for the viewer PiP. The ARKit capturedImage is
+    // always in the native landscape-right sensor frame; this maps the live device
+    // orientation to the CIImage orientation that displays it the way the operator holds
+    // the phone. Only the preview is rotated — training keyframes stay native (§5).
+    private var captureOrientation: CGImagePropertyOrientation = .right
+    private var orientationObserver: NSObjectProtocol?
 
     // Camera locks (SPEC.md §3): lock exposure + white balance, fixed focus pre-session.
     // Assert every frame; record a warning in session metadata if any lock is lost.
@@ -208,12 +214,48 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         arSession.run(config, options: [.resetTracking, .removeExistingAnchors])
         applyCameraLocks()
         governor.start()
+        startOrientationTracking()
+    }
+
+    private func startOrientationTracking() {
+        DispatchQueue.main.async {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            self.captureOrientation = Self.previewOrientation(for: UIDevice.current.orientation)
+            self.orientationObserver = NotificationCenter.default.addObserver(
+                forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                self?.captureOrientation = Self.previewOrientation(for: UIDevice.current.orientation)
+            }
+        }
+    }
+
+    private func stopOrientationTracking() {
+        DispatchQueue.main.async {
+            if let obs = self.orientationObserver {
+                NotificationCenter.default.removeObserver(obs)
+                self.orientationObserver = nil
+            }
+            UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        }
+    }
+
+    /// Map device orientation to the CIImage orientation that makes the native
+    /// landscape-right capturedImage display upright. Only affects the preview PiP.
+    private static func previewOrientation(for device: UIDeviceOrientation) -> CGImagePropertyOrientation {
+        switch device {
+        case .portrait: return .right
+        case .portraitUpsideDown: return .left
+        case .landscapeLeft: return .up        // device rotated left → sensor already upright
+        case .landscapeRight: return .down
+        default: return .right                 // faceUp/faceDown/unknown: assume portrait
+        }
     }
 
     func stop() {
         arSession?.pause()
         unlockCamera()
         governor.stop()
+        stopOrientationTracking()
         queue.async {
             if let ingest = self.ingest {
                 ingest.send(control: .sessionComplete, payload: [:])
@@ -368,7 +410,8 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     /// Small, low-quality JPEG for the live PiP (not a training keyframe): 640 px long
     /// edge at q0.5, so ~4 fps costs little bandwidth.
     private func previewJpeg(from pixelBuffer: CVPixelBuffer) -> Data? {
-        var image = CIImage(cvPixelBuffer: pixelBuffer)
+        // Rotate to match how the phone is held so the PiP is upright (preview only).
+        var image = CIImage(cvPixelBuffer: pixelBuffer).oriented(captureOrientation)
         let longEdge = max(image.extent.width, image.extent.height)
         if longEdge > Self.previewLongEdge {
             let s = Self.previewLongEdge / longEdge
