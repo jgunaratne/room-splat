@@ -11,7 +11,9 @@ import simd
 
 final class PointCloudFuser {
     private let voxelSize: Float = 0.02
-    private let maxPoints = 500_000
+    // Raised so normal rooms never hit the cap: the at-capacity path evicts high-texture
+    // voxels first (SPEC.md §3 planar bias), which starves the mesh's texture colors.
+    private let maxPoints = 1_000_000
     private let maxDepth: Float = 5.0
 
     private struct VoxelPoint {
@@ -139,12 +141,17 @@ final class PointCloudFuser {
                                Int32((p.y * inv).rounded(.down)),
                                Int32((p.z * inv).rounded(.down)))
         if let vp = voxels[key] { return vp.color }
-        for dz in Int32(-1)...1 {
-            for dy in Int32(-1)...1 {
-                for dx in Int32(-1)...1 {
-                    if dx == 0, dy == 0, dz == 0 { continue }
-                    if let vp = voxels[SIMD3<Int32>(key.x + dx, key.y + dy, key.z + dz)] {
-                        return vp.color
+        // Expand outward one shell at a time (±2 voxels = ±4 cm) and take the nearest
+        // occupied voxel. Mesh vertices rarely land exactly on a fused voxel, so a wider
+        // search fills texture gaps the ±1 shell missed.
+        for r in Int32(1)...2 {
+            for dz in -r...r {
+                for dy in -r...r {
+                    for dx in -r...r {
+                        if max(abs(dx), max(abs(dy), abs(dz))) != r { continue } // shell only
+                        if let vp = voxels[SIMD3<Int32>(key.x + dx, key.y + dy, key.z + dz)] {
+                            return vp.color
+                        }
                     }
                 }
             }
