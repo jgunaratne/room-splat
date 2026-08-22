@@ -29,6 +29,7 @@ class ControlType(str, Enum):
     SESSION_ABORT = "session_abort"
     # server -> phone
     ACK = "ack"
+    STAGE_ASSIGNMENT = "stage_assignment"
 
 
 # frame_index sentinel for the fused LiDAR cloud binary frame (not an image).

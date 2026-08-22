@@ -156,6 +156,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
                 client.onError = { [weak self] message in
                     self?.queue.async { self?.handleError(message) }
                 }
+                client.onStageAssignment = { [weak self] assignment in
+                    self?.queue.async { self?.handleStageAssignment(assignment) }
+                }
                 client.connect()
                 self.ingest = client
             }
@@ -297,7 +300,22 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         ]
         pendingSessionOpen = payload  // remembered so a reconnect can resume this session
         ingest.send(control: .sessionOpen, payload: payload)
-        ingest.send(control: .capabilityReport, payload: ["lidar": true, "scene_depth": true])
+        ingest.send(control: .capabilityReport, payload: [
+            "device_model": UIDevice.current.model,
+            "lidar": true,
+            "scene_depth": true,
+            "thermal_state": Self.name(for: ProcessInfo.processInfo.thermalState),
+            "preview_training_supported": true,
+        ])
+    }
+
+    private func handleStageAssignment(_ assignment: [String: Any]) {
+        print("[capture] server stage assignment: \(assignment)")
+        // Honor server stage assignment (SPEC.md §2):
+        // preview_training, coverage_analysis, keyframe_selection, lidar_fusion
+        if let previewEnabled = assignment["preview_training"] as? Bool {
+            print("[capture] on-device preview training assigned: \(previewEnabled)")
+        }
     }
 
     private func handlePolicy(_ policy: WorkPolicy, _ state: ProcessInfo.ThermalState) {

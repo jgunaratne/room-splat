@@ -45,6 +45,8 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     var onTransmit: ((Bool) -> Void)?
     /// Human-readable reason a connection failed (handshake error, TLS, drop), for the UI.
     var onError: ((String) -> Void)?
+    /// Stage assignment from the server (SPEC.md §2 capability negotiation).
+    var onStageAssignment: (([String: Any]) -> Void)?
 
     init(serverURL: URL) {
         self.serverURL = serverURL
@@ -152,8 +154,12 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     private func handleServerMessage(_ text: String) {
         guard let data = text.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-        if obj["type"] as? String == "ack", let idx = obj["frame_index"] as? Int {
+        let type = obj["type"] as? String
+        if type == "ack", let idx = obj["frame_index"] as? Int {
             highestAck = max(highestAck, idx)  // resume point on reconnect (§4)
+        } else if type == "stage_assignment" {
+            print("[ingest] received stage_assignment from server:", obj)
+            onStageAssignment?(obj)
         }
     }
 
