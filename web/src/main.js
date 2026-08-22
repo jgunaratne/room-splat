@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { PointCloudLayer } from "./pointcloud.js";
 import { CellManager } from "./cells.js";
 import { LiveFrustum } from "./frustum.js";
+import { CoverageLayer } from "./coverage.js";
 
 // The viewer is a pure consumer of the manifest (SPEC.md §4): it holds no derived
 // state the server cannot rebuild. A refresh mid-session recovers from the latest
@@ -23,6 +24,8 @@ controls.enableDamping = true;
 const cloud = new PointCloudLayer(scene);
 const cells = new CellManager(scene);
 const frustum = new LiveFrustum(scene);
+const coverage = new CoverageLayer(scene);
+let cellSize = null; // inferred from the first trained cell's bounds
 
 // Two camera modes (SPEC.md §4): follow tracks the live ARKit pose while a session is
 // open; free is a standard orbit. Switch to free on session_complete.
@@ -31,6 +34,14 @@ const statusEl = document.getElementById("status");
 const countsEl = document.getElementById("counts");
 const modeBtn = document.getElementById("mode");
 modeBtn.onclick = () => setMode(mode === "follow" ? "free" : "follow");
+
+const coverageBtn = document.getElementById("coverage");
+let coverageOn = true;
+coverageBtn.onclick = () => {
+  coverageOn = !coverageOn;
+  coverage.setEnabled(coverageOn);
+  coverageBtn.textContent = `coverage: ${coverageOn ? "on" : "off"}`;
+};
 function setMode(m) {
   mode = m;
   controls.enabled = m === "free";
@@ -42,12 +53,24 @@ let followTarget = null;
 
 function onManifest(msg) {
   if (msg.point_cloud_url) cloud.update(msg.point_cloud_url);
-  if (msg.cells?.length) cells.applyManifest(msg.cells);
+  if (msg.cells?.length) {
+    cells.applyManifest(msg.cells);
+    // Infer cell size once from a trained cell's bounds so the coverage layer can box
+    // even not-yet-trained under-covered cells without an extra manifest field.
+    if (cellSize == null) {
+      const b = msg.cells[0].bounds;
+      if (b?.length === 6) cellSize = b[3] - b[0];
+    }
+  }
+  if (msg.coverage) coverage.update(msg.coverage, cellSize);
   if (msg.live_pose) {
     const t = frustum.update(msg.live_pose);
     if (t) followTarget = t;
   }
-  countsEl.textContent = `tick ${msg.tick ?? "-"} · ${cells.count} cells`;
+  const undercovered = coverage.count;
+  countsEl.textContent =
+    `tick ${msg.tick ?? "-"} · ${cells.count} cells` +
+    (undercovered ? ` · ${undercovered} under-covered` : "");
 }
 
 function connect() {

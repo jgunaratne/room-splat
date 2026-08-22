@@ -82,10 +82,10 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
 - [ ] **Cell-size benchmark (M4, required).** Measure frame time + Spark sort cost at
   20/60/120 cells; if sort dominates, raise server `cell_size` to 2 m³. *Area:*
   `web/`, `web/README.md`. *Done when:* the results table in `web/README.md` is filled.
-- [~] **Coverage tinting.** — @jtui, 2026-08-22. The manifest already carries per-cell
-  `coverage`; tint under-covered cells so a second person can direct the operator
-  (SPEC.md §4). *Area:* `web/src/cells.js`, `web/src/main.js`. *Done when:* under-covered
-  cells render tinted.
+- [x] **Coverage tinting.** — @jtui, 2026-08-22. Under-covered cells (< 3 viewpoints)
+  render as severity-colored translucent boxes with a HUD toggle; cell size inferred
+  from cell bounds (viewer-only, no extra manifest field). `web/src/coverage.js`,
+  `web/src/main.js`. Live on sea.octo80.com (demo shows 24 under-covered).
 - [ ] **Visual verification against a real trained scene** (not synthetic). Confirm
   orientation/scale look right in-browser. *Area:* `web/`. *Depends on:* Track A M2 data.
 - [ ] **M8 shaders** (⛔ after M6): dissolve, tint, progressive reveal via Spark's
