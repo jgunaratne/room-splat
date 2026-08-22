@@ -30,6 +30,20 @@ def arkit_pose_to_transform_matrix(pose_column_major: np.ndarray) -> list[list[f
     return [[float(x) for x in row] for row in row_major]
 
 
+def opengl_c2w_to_opencv_w2c(c2w_row_major: np.ndarray) -> np.ndarray:
+    """transforms.json camera-to-world (OpenGL/Nerfstudio) -> world-to-camera (OpenCV).
+
+    The rasterizer (gsplat) works in the OpenCV convention (camera looks +Z, +Y down);
+    our poses are OpenGL (camera looks -Z, +Y up). Flip the camera Y and Z axes, then
+    invert. This is the exact conversion the GPU trainer uses; pinned by a test so a
+    stray sign flip (the mirrored-room / inside-out-camera bug, §5) fails loudly.
+    """
+    c2w = np.asarray(c2w_row_major, dtype=np.float64).reshape(4, 4)
+    gl_to_cv = np.diag([1.0, -1.0, -1.0, 1.0])
+    c2w_cv = c2w @ gl_to_cv
+    return np.linalg.inv(c2w_cv)
+
+
 def backproject_depth_sample(
     image_x: float,
     image_y: float,

@@ -16,11 +16,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Pin the exact working combination on the 5090 box (do not widen these ranges
-# without re-validating M2 — gsplat is sensitive to torch/CUDA, SPEC.md §7).
+# Validated working combination on this RTX 5090 (Blackwell sm_120), SPEC.md §7.
+# gsplat JIT-compiles CUDA kernels on first use; do not widen without re-running the
+# M2 GPU gate (tests/test_gsplat_gpu.py). See README.md for the version table.
 train = [
-    "torch==2.5.1",
-    "gsplat==1.4.0",
+    "torch==2.11.0",   # +cu130
+    "gsplat==1.5.3",
+    "pillow>=10",
+    "ninja",
 ]
 dev = [
     "pytest>=8",
