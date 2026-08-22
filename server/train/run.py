@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         backend = make_backend(args.backend, package_root=args.data)
 
-    backend.step(args.iters)
+    backend.step(args.iters, live=False)  # offline: all frames present, sample uniformly
     dt = time.monotonic() - t0
     log.info("stage=train backend=%s iters=%d wall_s=%.1f", args.backend, args.iters, dt)
 

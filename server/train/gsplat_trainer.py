@@ -101,7 +101,9 @@ class GsplatTrainer:
         # are stable whether frames are all present (offline) or trickling in (live).
         extent = (means.max(0).values - means.min(0).values).norm()
         self.scene_scale = float((0.5 * extent).clamp(min=1e-3))
-        # Init scale from local spacing so densification starts from a sane size.
+        # Init scale from each point's own local spacing so densification starts from a
+        # sane, spatially-varying size: dense/detailed regions start small instead of as
+        # oversized blobs the optimizer has to shrink back down.
         dist = self._mean_neighbor_dist(means).clamp(min=1e-4)
         scales = torch.log(dist)[:, None].repeat(1, 3)
         quats = torch.zeros(n, 4); quats[:, 0] = 1.0
@@ -122,14 +124,22 @@ class GsplatTrainer:
         })
 
     def _mean_neighbor_dist(self, means: torch.Tensor, k: int = 4, cap: int = 50_000) -> torch.Tensor:
-        # Estimate spacing from a random subset to keep it O(cap^2), broadcast back.
+        # Per-point mean distance to its k nearest neighbours. Neighbours are drawn from a
+        # random subset (capped for cost), but every point is queried against them, so the
+        # returned spacing varies with local density instead of collapsing to one global
+        # value. Queries are chunked to bound peak memory on large seed clouds.
         n = len(means)
-        idx = torch.randperm(n)[: min(n, cap)]
-        sub = means[idx]
-        d = torch.cdist(sub, sub)
-        d.fill_diagonal_(float("inf"))
-        knn = d.topk(min(k, len(sub) - 1), largest=False).values.mean(1)
-        return torch.full((n,), float(knn.mean()))
+        pts = means.to(self.device)
+        nbrs = pts[torch.randperm(n, device=self.device)[: min(n, cap)]]
+        kk = min(k, len(nbrs) - 1)
+        out = torch.empty(n, device=self.device)
+        chunk = 4096
+        for i in range(0, n, chunk):
+            d = torch.cdist(pts[i : i + chunk], nbrs)
+            # Drop the smallest per row: it is the point's own zero self-distance when the
+            # query is in the subset (and merely the true nearest otherwise).
+            out[i : i + chunk] = d.topk(kk + 1, largest=False, dim=1).values[:, 1:].mean(1)
+        return out.cpu()
 
     # ---- optim + strategy ---------------------------------------------------
 
@@ -170,14 +180,16 @@ class GsplatTrainer:
         )
         return renders, alphas, info
 
-    def _sample_cam(self, rng: np.random.Generator, n: int) -> int:
-        # 70% from the most recent 20 keyframes, 30% uniform (SPEC.md §4): puts gradient
-        # where the new data is without letting earlier regions degrade.
-        if n <= 20 or rng.random() < 0.3:
+    def _sample_cam(self, rng: np.random.Generator, n: int, live: bool) -> int:
+        # Live: 70% from the most recent 20 keyframes, 30% uniform (SPEC.md §4), to put
+        # gradient where the new data is without letting earlier regions degrade. In the
+        # finishing pass all views are present, so sample uniformly — biasing the last 20
+        # frames there would leave most of the room under-optimized.
+        if not live or n <= 20 or rng.random() < 0.3:
             return int(rng.integers(0, n))
         return int(rng.integers(n - 20, n))
 
-    def step(self, n_iters: int) -> None:
+    def step(self, n_iters: int, live: bool = True) -> None:
         self.refresh()  # pick up keyframes streamed since the last tick
         n_cams = len(self.viewmats)
         if n_cams == 0:
@@ -185,7 +197,7 @@ class GsplatTrainer:
         rng = np.random.default_rng()
         for _ in range(n_iters):
             step = self._iters
-            cam_id = self._sample_cam(rng, n_cams)
+            cam_id = self._sample_cam(rng, n_cams, live)
             cam_ids = torch.tensor([cam_id], device=self.device)
             renders, _alphas, info = self._rasterize(cam_ids)
             self.strategy.step_pre_backward(self.params, self.optimizers, self.strategy_state, step, info)

@@ -21,7 +21,7 @@ from .gaussian import GaussianCloud
 
 
 class Backend(Protocol):
-    def step(self, n_iters: int) -> None: ...
+    def step(self, n_iters: int, live: bool = True) -> None: ...
     def cloud(self) -> GaussianCloud: ...
     @property
     def total_iters(self) -> int: ...
@@ -36,9 +36,10 @@ class SyntheticBackend:
         self._rng = np.random.default_rng(seed)
         self._target_opacity = np.full_like(self._cloud.opacity, 0.9)
 
-    def step(self, n_iters: int) -> None:
+    def step(self, n_iters: int, live: bool = True) -> None:
         # Move opacity toward its target and jitter means slightly, so per-cell
         # dirty scores are non-zero early and decay to zero as cells converge.
+        # `live` is part of the interface but irrelevant to this deterministic stand-in.
         for _ in range(max(1, n_iters // 100)):
             self._cloud.opacity += 0.05 * (self._target_opacity - self._cloud.opacity)
         self._iters += n_iters
@@ -73,8 +74,8 @@ class GsplatBackend:
         self._backend = backend
         self._trainer = GsplatTrainer(package_root)
 
-    def step(self, n_iters: int) -> None:
-        self._trainer.step(n_iters)
+    def step(self, n_iters: int, live: bool = True) -> None:
+        self._trainer.step(n_iters, live=live)
 
     def cloud(self) -> GaussianCloud:
         return self._trainer.cloud()
