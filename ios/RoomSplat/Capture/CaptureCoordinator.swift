@@ -33,20 +33,35 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
     }
 
-    /// Map a user-entered host to a WebSocket URL: https->wss, http->ws, bare host->ws,
-    /// preserving any explicit ws(s):// scheme. Trailing slashes are trimmed.
+    /// Map a user-entered host to a WebSocket URL, preserving any explicit scheme
+    /// (https/wss -> wss, http/ws -> ws). A bare host defaults to **wss://** so App
+    /// Transport Security is satisfied against a public TLS endpoint like
+    /// sea.octo80.com; only obviously-local hosts (loopback, .local, RFC1918, or
+    /// Tailscale CGNAT 100.64/10) fall back to cleartext ws://, which additionally
+    /// requires NSAllowsLocalNetworking in the app's ATS settings. Trailing slashes
+    /// are trimmed so appendingPathComponent doesn't produce a double slash.
     static func normalizeWebSocketURL(_ host: String) -> String {
         var s = host.trimmingCharacters(in: .whitespacesAndNewlines)
         while s.hasSuffix("/") { s.removeLast() }
         let lower = s.lowercased()
-        if lower.hasPrefix("wss://") || lower.hasPrefix("ws://") {
-            return s
-        } else if lower.hasPrefix("https://") {
-            return "wss://" + s.dropFirst("https://".count)
-        } else if lower.hasPrefix("http://") {
-            return "ws://" + s.dropFirst("http://".count)
-        }
-        return "ws://" + s
+        if lower.hasPrefix("wss://") || lower.hasPrefix("ws://") { return s }
+        if lower.hasPrefix("https://") { return "wss://" + s.dropFirst("https://".count) }
+        if lower.hasPrefix("http://") { return "ws://" + s.dropFirst("http://".count) }
+        return (isLocalHost(lower) ? "ws://" : "wss://") + s
+    }
+
+    /// Heuristic for hosts that won't have a publicly-trusted TLS cert and so use ws://.
+    static func isLocalHost(_ host: String) -> Bool {
+        let name = host.split(separator: ":").first.map(String.init) ?? host
+        if name == "localhost" || name.hasSuffix(".local") { return true }
+        if !name.contains(".") { return true }              // bare mDNS name, e.g. "inception"
+        let o = name.split(separator: ".").compactMap { Int($0) }
+        guard o.count == 4 else { return false }            // not an IPv4 literal -> public DNS
+        if o[0] == 127 || o[0] == 10 { return true }
+        if o[0] == 192 && o[1] == 168 { return true }
+        if o[0] == 172 && (16...31).contains(o[1]) { return true }
+        if o[0] == 100 && (64...127).contains(o[1]) { return true } // Tailscale CGNAT
+        return false
     }
 
     private weak var arSession: ARSession?
