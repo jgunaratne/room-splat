@@ -106,6 +106,11 @@ class SessionManager:
         # quality/latency trade on the 5090; the synthetic backend ignores the count.
         self.finish_iters = int(os.environ.get("ROOMSPLAT_FINISH_ITERS", "7000"))
         self.finish_seconds = float(os.environ.get("ROOMSPLAT_FINISH_SECONDS", "60"))
+        # Saved projects live OUTSIDE data_dir/assets_dir (a sibling of assets_dir) so the
+        # Reset button, which wipes the live working area, never deletes a saved scene.
+        self.projects_dir = Path(os.environ.get(
+            "ROOMSPLAT_PROJECTS", str(self.assets_dir.parent / "projects")))
+        self.projects_dir.mkdir(parents=True, exist_ok=True)
         self.sessions: dict[str, SessionRuntime] = {}
         self.viewers: set[Any] = set()
 
@@ -151,6 +156,68 @@ class SessionManager:
                 dead.append(ws)
         for ws in dead:
             self.viewers.discard(ws)
+
+    # ---- saved projects -----------------------------------------------------
+
+    def save_project(self, session_id: str, name: str) -> dict | None:
+        """Snapshot a session's splat cells + LiDAR mesh into a saved project.
+
+        A project is a self-contained copy under projects_dir with a manifest whose asset
+        URLs point at /projects-assets, so it loads identically after a Reset or a server
+        restart. Returns the project metadata, or None if the session isn't in memory.
+        """
+        rt = self.sessions.get(session_id)
+        if rt is None:
+            return None
+        pid = session_id
+        pdir = self.projects_dir / pid
+        if pdir.exists():
+            shutil.rmtree(pdir)
+        pdir.mkdir(parents=True)
+        src = self.assets_dir / session_id
+        if (src / "cells").is_dir():
+            shutil.copytree(src / "cells", pdir / "cells")
+        for f in src.glob("cloud.*.bin"):
+            shutil.copy2(f, pdir / f.name)
+        has_mesh = bool(rt.session.room_mesh)
+        if has_mesh:
+            (pdir / "room.bin").write_bytes(rt.session.room_mesh)
+        # Rewrite asset URLs from the live /assets/<sid> prefix to the project snapshot.
+        snap = rt.manifest.snapshot()
+        old, new = f"/assets/{session_id}", f"/projects-assets/{pid}"
+        for c in snap["cells"]:
+            c["url"] = c["url"].replace(old, new)
+        if snap.get("point_cloud_url"):
+            snap["point_cloud_url"] = snap["point_cloud_url"].replace(old, new)
+        snap["live_pose"] = None  # a saved project is static, not a live capture
+        (pdir / "manifest.json").write_text(json.dumps(snap))
+        meta = {"id": pid, "name": name or pid[:8], "updated": time.time(),
+                "cells": len(snap["cells"]), "has_mesh": has_mesh}
+        (pdir / "project.json").write_text(json.dumps(meta))
+        log.info("stage=project_save id=%s name=%s cells=%d mesh=%s",
+                 pid, meta["name"], meta["cells"], has_mesh)
+        return meta
+
+    def list_projects(self) -> list[dict]:
+        out = []
+        for pj in self.projects_dir.glob("*/project.json"):
+            try:
+                out.append(json.loads(pj.read_text()))
+            except (OSError, ValueError):  # pragma: no cover - corrupt sidecar
+                continue
+        out.sort(key=lambda m: m.get("updated", 0), reverse=True)
+        return out
+
+    def load_project(self, pid: str) -> tuple[dict | None, str | None]:
+        """Return (manifest_snapshot, room_mesh_url) for a saved project, or (None, None)."""
+        mpath = self.projects_dir / pid / "manifest.json"
+        if not mpath.is_file():
+            return None, None
+        snap = json.loads(mpath.read_text())
+        room_url = None
+        if (self.projects_dir / pid / "room.bin").is_file():
+            room_url = f"/projects-assets/{pid}/room.bin"
+        return snap, room_url
 
     # ---- ingest -------------------------------------------------------------
 

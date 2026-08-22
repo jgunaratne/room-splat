@@ -14,6 +14,8 @@
       #hud b { color: #fff; }
       #hud button { font: inherit; margin-top: 6px; cursor: pointer; }
       #hud .hint { color: #7f8792; margin-top: 6px; }
+      #projectRow { margin-top: 6px; display: flex; gap: 4px; align-items: center; }
+      #projectRow select { font: inherit; max-width: 190px; }
       .warn { color: #ffb454; }
       #pip {
         position: fixed; top: 12px; right: 12px; z-index: 10;
@@ -66,6 +68,11 @@
       <button id="mode">camera: follow</button>
       <button id="coverage">coverage: on</button>
       <button id="reset">reset scene</button>
+      <div id="projectRow">
+        <button id="save">save project</button>
+        <select id="projects"><option value="">— saved projects —</option></select>
+        <button id="load">load</button>
+      </div>
       <div class="hint">click to look · WASD move · Space/Ctrl up·down · Shift boost · wheel zoom · Esc release</div>
     </div>
     <div id="pip">
