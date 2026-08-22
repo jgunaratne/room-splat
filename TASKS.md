@@ -118,9 +118,10 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
   *Done when:* the package validates against `roomsplat/package.py` and `points3D.ply`
   opens in MeshLab as a recognizable room. **This unblocks Track A M2.**
   — @antigravity, 2026-08-22
-- [ ] **Reconnect resume + real backpressure.** Resume from highest acked `frame_index`;
+- [x] **Reconnect resume + real backpressure.** Resume from highest acked `frame_index`;
   raise keyframe thresholds when the socket buffer exceeds 8 MB. *Area:* `Stream/`.
   *Done when:* a dropped wifi association resumes without restarting the walkthrough.
+  — @antigravity, 2026-08-22
 - [ ] **Capability report + thermal_state messages** on the wire; honor server stage
   assignment (no hardcoded split). *Area:* `Stream/`, `Capture/`.
 - [ ] **mDNS discovery** of the server on the local subnet (host setting already exists).

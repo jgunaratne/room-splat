@@ -94,23 +94,38 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
         sendBinary(frameIndex: Self.pointCloudFrameIndex, payload: data)
     }
 
+    private let queue = DispatchQueue(label: "roomsplat.ingest.client")
+    private var pendingBytes: Int = 0
+
     // MARK: binary framing
 
     private func sendBinary(frameIndex: UInt32, payload: Data) {
         var header = frameIndex.bigEndian
         var frame = Data(bytes: &header, count: 4)
         frame.append(payload)
+        let byteCount = frame.count
+
+        queue.sync {
+            pendingBytes += byteCount
+            if pendingBytes > Self.backpressureBytes {
+                DispatchQueue.main.async { [weak self] in
+                    self?.onBackpressure?()
+                }
+            }
+        }
+
         task?.send(.data(frame)) { [weak self] error in
+            guard let self else { return }
+            self.queue.sync {
+                self.pendingBytes = max(0, self.pendingBytes - byteCount)
+            }
             if let error { print("[ingest] binary send failed:", error) }
-            self?.onTransmit?(error == nil)
+            self.onTransmit?(error == nil)
         }
     }
 
     private func isBackpressured() -> Bool {
-        // URLSessionWebSocketTask does not expose bufferedAmount directly; approximate
-        // by tracking outstanding sends. On a WKWebView bridge this reads
-        // socket.bufferedAmount instead (SPEC.md §3).
-        false
+        queue.sync { pendingBytes > Self.backpressureBytes }
     }
 
     // MARK: receive (acks + reconnect)
@@ -145,8 +160,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     private func reconnect() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.connect()
-            // Caller resumes sending from highestAck + 1; capture is never blocked
-            // on acknowledgment.
+            // HighestAck is preserved so stream continues without restarting (§4)
         }
     }
 
