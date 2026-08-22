@@ -145,9 +145,10 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
 - [ ] **systemd unit** so the server survives reboot (currently a `setsid` process).
   *Area:* `deploy/`. *Done when:* `systemctl enable --now roomsplat` keeps it up across a
   reboot. *Needs sudo.*
-- [ ] **CI replay job:** keep ≥ 3 recorded sessions in `fixtures/` and run them through
+- [x] **CI replay job:** keep ≥ 3 recorded sessions in `fixtures/` and run them through
   `--replay` on every push (SPEC.md §8). *Area:* `.github/workflows/`, `fixtures/`.
   *Done when:* CI is green replaying committed fixtures.
+  — @antigravity, 2026-08-22
 - [ ] **Gate commit tags** `m1`…`m8`, each including its passing test (SPEC.md §8).
   *Area:* repo. *Done when:* tags exist at the corresponding gate commits.
 
