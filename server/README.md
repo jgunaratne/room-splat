@@ -35,13 +35,21 @@ python -m train.run --data /data/captures/<uuid>.roomsplat \
   --init-ply points3D.ply --backend gsplat --out /data/models/<uuid>/
 ```
 
-**Pin the working combination.** gsplat is sensitive to torch/CUDA (SPEC.md §7). The
-ranges in `pyproject.toml` `[train]` are a starting point; once M2 passes on this box,
-record the exact torch/CUDA/gsplat versions here:
+**Pin the working combination.** gsplat is sensitive to torch/CUDA (SPEC.md §7). gsplat
+JIT-compiles its CUDA extension on first use (~30 s one-time on this box). Validated
+combination:
 
-| torch | CUDA | gsplat | M2 status |
-|---|---|---|---|
-| — | — | — | not yet validated on this box |
+| torch | CUDA | gsplat | GPU | M2 status |
+|---|---|---|---|---|
+| 2.11.0+cu130 | 13.0 | 1.5.3 | RTX 5090 (sm_120) | GPU loop + convergence gate passing (`tests/test_gsplat_gpu.py`); metric-scale gate needs a real room capture |
+
+The GPU convergence test renders ground-truth views from a known cloud, seeds training
+with gray colors, and asserts appearance is recovered — this also exercises the §5
+coordinate conversion on real kernels. Run it with:
+
+```bash
+python -m pytest tests/test_gsplat_gpu.py -q   # auto-skips without CUDA/gsplat
+```
 
 ## Replay (M3 gate, §8)
 

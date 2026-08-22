@@ -52,40 +52,39 @@ class SyntheticBackend:
 
 
 class GsplatBackend:
-    """Real gsplat training. Structure only; requires torch+gsplat on the 5090 box.
+    """Real gsplat training. Requires torch+gsplat on the 5090 box.
 
     Reads a `.roomsplat` package through the shared parser, builds a gsplat trainer
     seeded from points3D.ply, and exposes the current Gaussians as a GaussianCloud.
+    `fastgs`/`fastergs` are accepted names for the M6 accelerated forks and currently
+    route to the same trainer until those backends are wired in.
     """
 
     def __init__(self, package_root, backend: str = "gsplat"):
-        import torch  # noqa: F401  (lazy: never import CUDA at module load)
-
         try:
-            import gsplat  # noqa: F401
+            from .gsplat_trainer import GsplatTrainer
         except ImportError as e:  # pragma: no cover - depends on the box
             raise RuntimeError(
-                "gsplat is not installed. Pin torch+CUDA+gsplat in pyproject.toml and "
-                "record the working combination in server/README.md (SPEC.md §7)."
+                "torch/gsplat are not installed. `pip install -e '.[train]'` on the 5090 "
+                "box and record the working torch/CUDA/gsplat combo in server/README.md."
             ) from e
+        if package_root is None:
+            raise ValueError("GsplatBackend needs package_root (path to a .roomsplat)")
         self._backend = backend
-        self._package_root = package_root
-        self._iters = 0
-        # Full trainer wiring (dataset, strategy, optimizers) is built on the GPU box.
-        raise NotImplementedError(
-            "GsplatBackend requires the 5090 environment; run the M2 gate there. "
-            "Use SyntheticBackend for GPU-free pipeline tests."
-        )
+        self._trainer = GsplatTrainer(package_root)
 
-    def step(self, n_iters: int) -> None:  # pragma: no cover
-        raise NotImplementedError
+    def step(self, n_iters: int) -> None:
+        self._trainer.step(n_iters)
 
-    def cloud(self) -> GaussianCloud:  # pragma: no cover
-        raise NotImplementedError
+    def cloud(self) -> GaussianCloud:
+        return self._trainer.cloud()
+
+    def write_ply_full(self, path) -> None:
+        self._trainer.write_ply_full(path)
 
     @property
-    def total_iters(self) -> int:  # pragma: no cover
-        return self._iters
+    def total_iters(self) -> int:
+        return self._trainer.total_iters
 
 
 def make_backend(name: str, seed_xyz=None, seed_rgb=None, package_root=None) -> Backend:

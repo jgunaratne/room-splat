@@ -53,7 +53,10 @@ def main(argv: list[str] | None = None) -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     out_ply = args.out / "point_cloud.ply"
-    backend.cloud().write_ply(out_ply)
+    if hasattr(backend, "write_ply_full"):
+        backend.write_ply_full(out_ply)  # full-SH, view-dependent color
+    else:
+        backend.cloud().write_ply(out_ply)
     log.info("stage=export path=%s splats=%d", out_ply, len(backend.cloud()))
     return 0
 
