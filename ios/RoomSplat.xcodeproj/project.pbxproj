@@ -17,6 +17,7 @@
 		AD8C92DD7EC4A7CE5E5E60E0 /* PointCloudFuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */; };
 		BC7FA985790D0F8B7A6C3388 /* BlurScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 596A59026967C4C01114347E /* BlurScore.swift */; };
 		C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */; };
+		C8AC0766A11AD5287CA1C97F /* RoomMeshEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09A6F7A9CEB630E1C9827C2 /* RoomMeshEncoder.swift */; };
 		D5C248F4A664F1B84E12E271 /* PackageWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46890EE570C18F68C77C903 /* PackageWriter.swift */; };
 		DE8B59679715A57A2191BAFE /* RoomSplatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D898E9AEB2372348F50554AB /* RoomSplatApp.swift */; };
 		E02073CF36815026328D6A5D /* CoordinateTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A12CEBA056FBA87D10F985 /* CoordinateTransform.swift */; };
@@ -28,12 +29,13 @@
 		3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyframeSelector.swift; sourceTree = "<group>"; };
 		3FCCAE05E765A222274F978F /* ThermalGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGovernor.swift; sourceTree = "<group>"; };
 		4131C56B0CD9D76927C40B21 /* ServerDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerDiscovery.swift; sourceTree = "<group>"; };
-		43518463371D6070F2A683A9 /* RoomSplat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RoomSplat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		43518463371D6070F2A683A9 /* RoomSplat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RoomSplat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCoordinator.swift; sourceTree = "<group>"; };
 		596A59026967C4C01114347E /* BlurScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurScore.swift; sourceTree = "<group>"; };
 		6B78383F362518EC05C3D65D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointCloudFuser.swift; sourceTree = "<group>"; };
 		9132FABFA83E5056F07AFC6D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A09A6F7A9CEB630E1C9827C2 /* RoomMeshEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMeshEncoder.swift; sourceTree = "<group>"; };
 		B46890EE570C18F68C77C903 /* PackageWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageWriter.swift; sourceTree = "<group>"; };
 		D898E9AEB2372348F50554AB /* RoomSplatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSplatApp.swift; sourceTree = "<group>"; };
 		E2AD460081D6294F4F8C1E4B /* IngestClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestClient.swift; sourceTree = "<group>"; };
@@ -80,6 +82,7 @@
 				3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */,
 				B46890EE570C18F68C77C903 /* PackageWriter.swift */,
 				7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */,
+				A09A6F7A9CEB630E1C9827C2 /* RoomMeshEncoder.swift */,
 				3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */,
 			);
 			path = Capture;
@@ -147,6 +150,8 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = E067263546F0D5B68BAEAF18 /* Build configuration list for PBXProject "RoomSplat" */;
 			developmentRegion = en;
@@ -192,6 +197,7 @@
 				C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */,
 				D5C248F4A664F1B84E12E271 /* PackageWriter.swift in Sources */,
 				AD8C92DD7EC4A7CE5E5E60E0 /* PointCloudFuser.swift in Sources */,
+				C8AC0766A11AD5287CA1C97F /* RoomMeshEncoder.swift in Sources */,
 				DE8B59679715A57A2191BAFE /* RoomSplatApp.swift in Sources */,
 				5C4DD7630E6DDB561A0276E9 /* ServerDiscovery.swift in Sources */,
 				53B4D2B5E154CDABAC6D24A4 /* ThermalGovernor.swift in Sources */,
@@ -206,7 +212,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = HM32H656B6;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RoomSplat/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -347,7 +352,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = HM32H656B6;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = RoomSplat/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
