@@ -105,10 +105,11 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
 - [x] Blur score (variance-of-Laplacian, downscaled) — `Capture/BlurScore.swift`
 - [x] Point cloud fuser (initial) — `Capture/PointCloudFuser.swift`
 
-- [ ] **LiDAR fusion to spec:** 2 cm voxel downsample, 500k cap, bias retention toward
+- [x] **LiDAR fusion to spec:** 2 cm voxel downsample, 500k cap, bias retention toward
   planar low-texture regions, resend cloud every 50 keyframes; never transmit per-frame
   depth. *Area:* `Capture/PointCloudFuser.swift`. *Done when:* fused cloud matches §3
   params and streams incrementally.
+  — @antigravity, 2026-08-22
 - [x] **Camera locks:** lock exposure + white balance, fixed focus; assert every frame;
   record a warning in session metadata if a lock is lost. *Area:* `Capture/`. *Done when:*
   locks are applied pre-session and `tracking_warnings` records losses.

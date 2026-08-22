@@ -14,7 +14,12 @@ final class PointCloudFuser {
     private let maxPoints = 500_000
     private let maxDepth: Float = 5.0
 
-    private var voxels: [SIMD3<Int32>: SIMD3<UInt8>] = [:]
+    private struct VoxelPoint {
+        var color: SIMD3<UInt8>
+        var isPlanarLowTexture: Bool
+    }
+
+    private var voxels: [SIMD3<Int32>: VoxelPoint] = [:]
     private let ciContext = CIContext(options: nil)
 
     var count: Int { voxels.count }
@@ -22,7 +27,7 @@ final class PointCloudFuser {
     func reset() { voxels.removeAll(keepingCapacity: true) }
 
     func integrate(frame: ARFrame) {
-        guard voxels.count < maxPoints, let sceneDepth = frame.sceneDepth else { return }
+        guard let sceneDepth = frame.sceneDepth else { return }
         let depth = sceneDepth.depthMap
         let confidence = sceneDepth.confidenceMap
         let dw = CVPixelBufferGetWidth(depth)
@@ -63,6 +68,28 @@ final class PointCloudFuser {
                 let z = depthPtr[y * depthStride + x]
                 guard z > 0, z < maxDepth else { continue }
 
+                // Check local color gradient (low texture metric)
+                let i = (y * dw + x) * 4
+                let r = Float(rgba[i])
+                let g = Float(rgba[i + 1])
+                let b = Float(rgba[i + 2])
+                let luma = 0.299 * r + 0.587 * g + 0.114 * b
+
+                var maxNeighborDiff: Float = 0
+                if x > 0 {
+                    let ni = (y * dw + (x - 1)) * 4
+                    let nl = 0.299 * Float(rgba[ni]) + 0.587 * Float(rgba[ni + 1]) + 0.114 * Float(rgba[ni + 2])
+                    maxNeighborDiff = max(maxNeighborDiff, abs(luma - nl))
+                }
+                if y > 0 {
+                    let ni = ((y - 1) * dw + x) * 4
+                    let nl = 0.299 * Float(rgba[ni]) + 0.587 * Float(rgba[ni + 1]) + 0.114 * Float(rgba[ni + 2])
+                    maxNeighborDiff = max(maxNeighborDiff, abs(luma - nl))
+                }
+
+                // Low texture: smooth walls/ceilings where photometric gradient is low (< 15)
+                let isLowTexture = maxNeighborDiff < 15.0
+
                 let world = CoordinateTransform.worldPoint(
                     imageX: Float(x), imageY: Float(y), depth: z,
                     intrinsics: scaled, cameraToWorld: cameraToWorld
@@ -71,9 +98,19 @@ final class PointCloudFuser {
                                        Int32((world.y * inv).rounded(.down)),
                                        Int32((world.z * inv).rounded(.down)))
                 if voxels[key] == nil {
-                    guard voxels.count < maxPoints else { return }
-                    let i = (y * dw + x) * 4
-                    voxels[key] = SIMD3<UInt8>(rgba[i], rgba[i + 1], rgba[i + 2])
+                    if voxels.count >= maxPoints {
+                        // When at capacity, bias retention toward planar low-texture regions (§3):
+                        // If new point is low-texture, try to replace a high-texture point
+                        if isLowTexture, let nonPlanarKey = voxels.first(where: { !$0.value.isPlanarLowTexture })?.key {
+                            voxels.removeValue(forKey: nonPlanarKey)
+                        } else {
+                            continue
+                        }
+                    }
+                    voxels[key] = VoxelPoint(
+                        color: SIMD3<UInt8>(rgba[i], rgba[i + 1], rgba[i + 2]),
+                        isPlanarLowTexture: isLowTexture
+                    )
                 }
             }
         }
@@ -81,13 +118,13 @@ final class PointCloudFuser {
 
     /// Retrieve the current fused points as (position, color) tuples.
     var points: [(position: SIMD3<Float>, color: SIMD3<UInt8>)] {
-        voxels.map { key, color in
+        voxels.map { key, pt in
             let pos = SIMD3<Float>(
                 (Float(key.x) + 0.5) * voxelSize,
                 (Float(key.y) + 0.5) * voxelSize,
                 (Float(key.z) + 0.5) * voxelSize
             )
-            return (position: pos, color: color)
+            return (position: pos, color: pt.color)
         }
     }
 
@@ -96,16 +133,16 @@ final class PointCloudFuser {
         var data = Data()
         var count = UInt32(voxels.count)
         appendRaw(&count, to: &data)
-        for (key, color) in voxels {
+        for (key, pt) in voxels {
             var x = (Float(key.x) + 0.5) * voxelSize
             var y = (Float(key.y) + 0.5) * voxelSize
             var z = (Float(key.z) + 0.5) * voxelSize
             appendRaw(&x, to: &data)
             appendRaw(&y, to: &data)
             appendRaw(&z, to: &data)
-            data.append(color.x)
-            data.append(color.y)
-            data.append(color.z)
+            data.append(pt.color.x)
+            data.append(pt.color.y)
+            data.append(pt.color.z)
         }
         return data
     }
