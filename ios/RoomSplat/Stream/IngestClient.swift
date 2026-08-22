@@ -42,6 +42,8 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     var onConnectionChange: ((Bool) -> Void)?
     /// Outcome of the most recent frame send: true if it left the socket, false on error.
     var onTransmit: ((Bool) -> Void)?
+    /// Human-readable reason a connection failed (handshake error, TLS, drop), for the UI.
+    var onError: ((String) -> Void)?
 
     init(serverURL: URL) {
         self.serverURL = serverURL
@@ -122,6 +124,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
             case .failure(let error):
                 print("ingest receive failed, reconnecting:", error)
                 self.stopKeepalive()
+                self.onError?(error.localizedDescription)
                 self.onConnectionChange?(false)
                 self.reconnect()
             }
@@ -155,7 +158,21 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
                     didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
         stopKeepalive()
+        if let reason, let text = String(data: reason, encoding: .utf8), !text.isEmpty {
+            onError?("closed (\(closeCode.rawValue)): \(text)")
+        } else {
+            onError?("closed (code \(closeCode.rawValue))")
+        }
         onConnectionChange?(false)
+    }
+
+    /// Fires when the underlying task ends — including a handshake that never opened
+    /// (e.g. Cloudflare returns 403/1006 or a TLS error), which `didClose` won't report.
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error {
+            onError?(error.localizedDescription)
+            onConnectionChange?(false)
+        }
     }
 
     // MARK: keepalive
