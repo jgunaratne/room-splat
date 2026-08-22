@@ -159,6 +159,56 @@ document.getElementById("reset").onclick = () => {
   logLine("reset requested…", "warn");
 };
 
+// Saved projects: snapshot the current scene (splat cells + LiDAR mesh) server-side,
+// list them, and load one back for inspection without disturbing a live capture.
+let currentSessionId = null;
+const projectsSel = document.getElementById("projects");
+
+async function refreshProjects() {
+  try {
+    const list = await (await fetch("/projects")).json();
+    projectsSel.innerHTML = '<option value="">— saved projects —</option>';
+    for (const p of list) {
+      const o = document.createElement("option");
+      o.value = p.id;
+      const when = new Date((p.updated || 0) * 1000).toLocaleString();
+      o.textContent = `${p.name} · ${p.cells} cells${p.has_mesh ? " · mesh" : ""} · ${when}`;
+      projectsSel.appendChild(o);
+    }
+  } catch { /* offline; leave the list as-is */ }
+}
+
+document.getElementById("save").onclick = () => {
+  if (!currentSessionId) { logLine("nothing to save yet", "warn"); return; }
+  const name = prompt("Save project as:", `room ${new Date().toLocaleString()}`);
+  if (name == null) return;
+  viewerWs?.send(JSON.stringify({ type: "save_project", session_id: currentSessionId, name }));
+};
+
+document.getElementById("load").onclick = () => {
+  const id = projectsSel.value;
+  if (!id) { logLine("pick a saved project first", "warn"); return; }
+  clearForLoad();
+  viewerWs?.send(JSON.stringify({ type: "load_project", id }));
+  logLine("loading saved project…", "dim");
+};
+
+// Clear the viewer for a load without asking the server to drop the live session.
+function clearForLoad() {
+  cells.clear();
+  cloud.clear();
+  coverage.clear();
+  frustum.clear();
+  roomMesh.clear();
+  roomMeshInfo = null;
+  cellSize = null;
+  lastCloudUrl = null;
+  followTarget = null;
+  hidePip();
+  setMode("fly"); // saved projects are static — free-look, not follow
+  countsEl.textContent = "";
+}
+
 function clearScene() {
   cells.clear();
   cloud.clear();
@@ -247,6 +297,7 @@ function escapeHtml(s) {
 
 let lastCloudUrl = null;
 function onManifest(msg) {
+  if (msg.session_id) currentSessionId = msg.session_id;
   if (msg.point_cloud_url) {
     if (msg.point_cloud_url !== lastCloudUrl) {
       lastCloudUrl = msg.point_cloud_url;
@@ -282,6 +333,7 @@ function connect() {
   ws.onopen = () => {
     statusEl.textContent = "live";
     logLine("connected to server", "ok");
+    refreshProjects();
   };
   ws.onclose = () => {
     statusEl.textContent = "reconnecting…";
@@ -294,9 +346,12 @@ function connect() {
     else if (msg.type === "reset") {
       clearScene();
     } else if (msg.type === "room_mesh") {
+      // Live meshes are served from /room/<id>.bin; a saved project carries an explicit
+      // /projects-assets URL instead.
+      const base = msg.url || `/room/${msg.session_id}.bin`;
       roomMeshInfo = {
         session_id: msg.session_id,
-        url: `/room/${msg.session_id}.bin?v=${msg.version}`,
+        url: `${base}?v=${msg.version}`,
         version: msg.version,
       };
       if (tab === "lidar") {
@@ -304,9 +359,12 @@ function connect() {
           if (info) logLine(`LiDAR room mesh: ${info.triangles.toLocaleString()} triangles`);
         });
       }
+    } else if (msg.type === "projects") {
+      refreshProjects();
     } else if (msg.type === "log") {
       logLine(msg.msg, msg.level === "warn" ? "warn" : "info");
     } else if (msg.type === "live_pose") {
+      if (msg.session_id) currentSessionId = msg.session_id;
       const t = frustum.update(msg.pose);
       if (t) followTarget = t;
     } else if (msg.type === "live_frame") {
