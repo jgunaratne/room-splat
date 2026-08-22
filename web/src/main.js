@@ -119,11 +119,19 @@ function setTab(t) {
   const splat = t === "splat";
   cells.setVisible(splat);
   coverage.setEnabled(splat && coverageOn);
-  // The LiDAR mesh stays visible in both tabs: on the splat tab it is a live wireframe
-  // scaffold the splats fill in; on the LiDAR tab it is the room, shaded with the
-  // camera-sampled polygon colors.
+  // The LiDAR mesh stays visible in both tabs. On the splat tab it is a live wireframe
+  // scaffold the splats fill in; on the LiDAR tab the texture/wireframe layers follow
+  // the toggle buttons.
   roomMesh.setVisible(true);
-  roomMesh.setColored(!splat);
+  if (splat) {
+    roomMesh.setTex(false);
+    roomMesh.setWire(true);
+    lidarOpts.style.display = "none";
+  } else {
+    roomMesh.setTex(lidarTex);
+    roomMesh.setWire(lidarWire);
+    lidarOpts.style.display = "flex";
+  }
   // In LiDAR mode the point cloud IS the room, so make it denser-looking; in splat mode
   // it's just the under-layer, kept fine.
   cloud.setPointSize(splat ? 0.015 : 0.03);
@@ -136,6 +144,24 @@ function setTab(t) {
 }
 tabSplat.onclick = () => setTab("splat");
 tabLidar.onclick = () => setTab("lidar");
+
+// LiDAR-tab display toggles: texture (camera-colored polygons) and wireframe, shown
+// only on the LiDAR tab (the splat tab always uses the wireframe as a scaffold).
+const lidarOpts = document.getElementById("lidarOpts");
+let lidarTex = true;
+let lidarWire = false;
+const texBtn = document.getElementById("toggleTex");
+const wireBtn = document.getElementById("toggleWire");
+texBtn.onclick = () => {
+  lidarTex = !lidarTex;
+  roomMesh.setTex(lidarTex);
+  texBtn.textContent = `texture: ${lidarTex ? "on" : "off"}`;
+};
+wireBtn.onclick = () => {
+  lidarWire = !lidarWire;
+  roomMesh.setWire(lidarWire);
+  wireBtn.textContent = `wireframe: ${lidarWire ? "on" : "off"}`;
+};
 
 // Camera modes (SPEC.md §4): follow tracks the live ARKit pose while a session is open;
 // fly is game-style pointer-lock free-look (the default free mode); orbit is the

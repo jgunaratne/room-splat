@@ -26,37 +26,33 @@ function readVec3(view, off, count, stride) {
 export class RoomMesh {
   constructor(scene) {
     this.scene = scene;
-    this.mesh = null;
+    this.geom = null;
+    this.solidMesh = null; // textured (camera-colored) polygons
+    this.wireMesh = null;  // wireframe overlay
     this.version = -1;
     this._url = null;
-    this.visible = true;  // shown by default (also overlaid on the splat view)
-    this.colored = false; // set true on the LiDAR tab to shade the polygons
-    this.hasColor = false; // whether the current mesh carries per-vertex color
-    // Cyan wireframe: mirrors the phone's ARKit triangle overlay (scaffold on the splat
-    // tab, and the fallback when a mesh has no camera color yet).
+    this.visible = true;   // tab-level visibility
+    this.showTex = true;   // texture (solid colored) layer on
+    this.showWire = false; // wireframe layer off
+    this.hasColor = false;
+    // Cyan wireframe: mirrors the phone's ARKit triangle overlay.
     this.wireMat = new THREE.MeshBasicMaterial({
       color: 0x6fd3ff, wireframe: true, transparent: true, opacity: 0.6,
     });
-    // Solid, unlit, camera-colored polygons for the LiDAR tab.
-    this.colorMat = new THREE.MeshBasicMaterial({
-      vertexColors: true, side: THREE.DoubleSide,
-    });
+    // Solid, unlit, camera-colored polygons.
+    this.colorMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    // Fallback solid when a mesh has no per-vertex color yet.
+    this.flatMat = new THREE.MeshBasicMaterial({ color: 0x9aa4b2, side: THREE.DoubleSide });
   }
 
-  _material() {
-    return this.colored && this.hasColor ? this.colorMat : this.wireMat;
+  _applyVis() {
+    if (this.solidMesh) this.solidMesh.visible = this.visible && this.showTex;
+    if (this.wireMesh) this.wireMesh.visible = this.visible && this.showWire;
   }
 
-  setVisible(on) {
-    this.visible = on;
-    if (this.mesh) this.mesh.visible = on;
-  }
-
-  // Toggle solid camera-colored shading (LiDAR tab) vs the wireframe overlay (splat tab).
-  setColored(on) {
-    this.colored = on;
-    if (this.mesh) this.mesh.material = this._material();
-  }
+  setVisible(on) { this.visible = on; this._applyVis(); }
+  setTex(on) { this.showTex = on; this._applyVis(); }
+  setWire(on) { this.showWire = on; this._applyVis(); }
 
   async update(url, version) {
     if (!url || version <= this.version) return;
@@ -88,23 +84,26 @@ export class RoomMesh {
     geom.setIndex(new THREE.BufferAttribute(indices, 1));
 
     this.hasColor = !!colors;
-    const next = new THREE.Mesh(geom, this._material());
-    next.visible = this.visible;
-    if (this.mesh) {
-      this.scene.remove(this.mesh);
-      this.mesh.geometry.dispose();
-    }
-    this.mesh = next;
-    this.scene.add(next);
+    // Two meshes over one geometry: independently toggleable texture + wireframe layers.
+    const solid = new THREE.Mesh(geom, this.hasColor ? this.colorMat : this.flatMat);
+    const wire = new THREE.Mesh(geom, this.wireMat);
+    this._disposeMeshes();
+    this.geom = geom;
+    this.solidMesh = solid;
+    this.wireMesh = wire;
+    this.scene.add(solid, wire);
+    this._applyVis();
     return { vertices: vCount, triangles: iCount / 3 };
   }
 
+  _disposeMeshes() {
+    for (const m of [this.solidMesh, this.wireMesh]) if (m) this.scene.remove(m);
+    if (this.geom) this.geom.dispose();
+    this.geom = this.solidMesh = this.wireMesh = null;
+  }
+
   clear() {
-    if (this.mesh) {
-      this.scene.remove(this.mesh);
-      this.mesh.geometry.dispose();
-      this.mesh = null;
-    }
+    this._disposeMeshes();
     this.version = -1;
     this._url = null;
     this.hasColor = false;
