@@ -11,6 +11,10 @@
 		53B4D2B5E154CDABAC6D24A4 /* ThermalGovernor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCCAE05E765A222274F978F /* ThermalGovernor.swift */; };
 		64B2CA7219DA95CCFBF9B26E /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */; };
 		6DA341287BB118BBA3EF339F /* IngestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AD460081D6294F4F8C1E4B /* IngestClient.swift */; };
+		72B55A2EB22698C9B7E0980E /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CD28A82ED54B2C1712B347 /* CameraPreview.swift */; };
+		9FDCA5DEF97E022CCE1982E8 /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */; };
+		AD8C92DD7EC4A7CE5E5E60E0 /* PointCloudFuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */; };
+		BC7FA985790D0F8B7A6C3388 /* BlurScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 596A59026967C4C01114347E /* BlurScore.swift */; };
 		C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */; };
 		DE8B59679715A57A2191BAFE /* RoomSplatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D898E9AEB2372348F50554AB /* RoomSplatApp.swift */; };
 		E02073CF36815026328D6A5D /* CoordinateTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A12CEBA056FBA87D10F985 /* CoordinateTransform.swift */; };
@@ -22,12 +26,24 @@
 		3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyframeSelector.swift; sourceTree = "<group>"; };
 		3FCCAE05E765A222274F978F /* ThermalGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGovernor.swift; sourceTree = "<group>"; };
 		43518463371D6070F2A683A9 /* RoomSplat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RoomSplat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCoordinator.swift; sourceTree = "<group>"; };
+		596A59026967C4C01114347E /* BlurScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurScore.swift; sourceTree = "<group>"; };
+		7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointCloudFuser.swift; sourceTree = "<group>"; };
 		9132FABFA83E5056F07AFC6D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D898E9AEB2372348F50554AB /* RoomSplatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSplatApp.swift; sourceTree = "<group>"; };
 		E2AD460081D6294F4F8C1E4B /* IngestClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestClient.swift; sourceTree = "<group>"; };
+		F3CD28A82ED54B2C1712B347 /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		018E314BC1BC820687AC7CD9 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F3CD28A82ED54B2C1712B347 /* CameraPreview.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		055919B80FC7B9B705E82709 /* RoomSplat */ = {
 			isa = PBXGroup;
 			children = (
@@ -35,6 +51,7 @@
 				1D3ADE29C916A95A5BB7441E /* Capture */,
 				5A09821658C01F0FAC868AD7 /* Governor */,
 				10C8D6D10BBF4059C590D854 /* Stream */,
+				018E314BC1BC820687AC7CD9 /* Views */,
 			);
 			path = RoomSplat;
 			sourceTree = "<group>";
@@ -50,8 +67,11 @@
 		1D3ADE29C916A95A5BB7441E /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				596A59026967C4C01114347E /* BlurScore.swift */,
+				48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */,
 				30A12CEBA056FBA87D10F985 /* CoordinateTransform.swift */,
 				3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */,
+				7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */,
 				3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */,
 			);
 			path = Capture;
@@ -157,10 +177,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC7FA985790D0F8B7A6C3388 /* BlurScore.swift in Sources */,
+				72B55A2EB22698C9B7E0980E /* CameraPreview.swift in Sources */,
+				9FDCA5DEF97E022CCE1982E8 /* CaptureCoordinator.swift in Sources */,
 				0725DCC83544B3B28AAB4793 /* ContentView.swift in Sources */,
 				E02073CF36815026328D6A5D /* CoordinateTransform.swift in Sources */,
 				6DA341287BB118BBA3EF339F /* IngestClient.swift in Sources */,
 				C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */,
+				AD8C92DD7EC4A7CE5E5E60E0 /* PointCloudFuser.swift in Sources */,
 				DE8B59679715A57A2191BAFE /* RoomSplatApp.swift in Sources */,
 				53B4D2B5E154CDABAC6D24A4 /* ThermalGovernor.swift in Sources */,
 			);
@@ -176,6 +200,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "RoomSplat uses the camera and LiDAR to capture the room.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "RoomSplat streams captured frames to your local ingest server.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -318,6 +343,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "RoomSplat uses the camera and LiDAR to capture the room.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "RoomSplat streams captured frames to your local ingest server.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
