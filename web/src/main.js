@@ -20,6 +20,47 @@ document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+const clock = new THREE.Clock();
+
+// WASD fly navigation (works in free mode): W/S forward-back along the view direction,
+// A/D strafe, Q/E (or Space/Ctrl) down/up, Shift to move faster. Movement translates the
+// camera AND the orbit target together, so mouse-drag still looks around as you fly.
+const keys = new Set();
+const MOVE_SPEED = 2.5;   // metres/second
+const BOOST = 4;          // Shift multiplier
+const MOVE_KEYS = new Set(["w", "a", "s", "d", "q", "e", " "]);
+addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  if (MOVE_KEYS.has(k)) {
+    keys.add(k);
+    if (mode === "follow") setMode("free"); // take control, like a drag
+    if (k === " ") e.preventDefault();      // don't scroll the page
+  }
+});
+addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+addEventListener("blur", () => keys.clear());
+
+function applyFlyMovement(dt) {
+  if (keys.size === 0) return;
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+  const move = new THREE.Vector3();
+  if (keys.has("w")) move.add(forward);
+  if (keys.has("s")) move.sub(forward);
+  if (keys.has("d")) move.add(right);
+  if (keys.has("a")) move.sub(right);
+  if (keys.has("e") || keys.has(" ")) move.y += 1;
+  if (keys.has("q")) move.y -= 1;
+  if (move.lengthSq() === 0) return;
+  const speed = MOVE_SPEED * (keys.has("shift") ? BOOST : 1) * dt;
+  move.normalize().multiplyScalar(speed);
+  camera.position.add(move);
+  controls.target.add(move);
+}
+// Shift tracked separately (it isn't a movement key on its own).
+addEventListener("keydown", (e) => { if (e.key === "Shift") keys.add("shift"); });
+addEventListener("keyup", (e) => { if (e.key === "Shift") keys.delete("shift"); });
 
 const cloud = new PointCloudLayer(scene);
 const cells = new CellManager(scene);
@@ -169,12 +210,14 @@ addEventListener("resize", () => {
 
 function animate() {
   requestAnimationFrame(animate);
+  const dt = clock.getDelta();
   if (mode === "follow" && followTarget) {
     // Ease the browser camera toward the operator so the screen shows what's scanned.
     const desired = followTarget.clone().add(new THREE.Vector3(0, 1.5, 3));
     camera.position.lerp(desired, 0.05);
     camera.lookAt(followTarget);
   } else {
+    applyFlyMovement(dt);
     controls.update();
   }
   renderer.render(scene, camera);
