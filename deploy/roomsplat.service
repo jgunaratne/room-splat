@@ -1,0 +1,21 @@
+[Unit]
+Description=RoomSplat Progressive Gaussian Splatting Server
+After=network.target
+
+[Service]
+Type=simple
+User=junius
+WorkingDirectory=/home/junius/git/room-splat/server
+Environment="ROOMSPLAT_WEB=/home/junius/git/room-splat/web/dist"
+Environment="ROOMSPLAT_DATA=/home/junius/git/room-splat/server/data/captures"
+Environment="ROOMSPLAT_ASSETS=/home/junius/git/room-splat/server/data/assets"
+Environment="ROOMSPLAT_BACKEND=gsplat"
+Environment="PATH=/home/junius/.local/bin:/usr/local/cuda/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/junius/git/room-splat/server/run-server.sh
+Restart=always
+RestartSec=5s
+KillMode=process
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
