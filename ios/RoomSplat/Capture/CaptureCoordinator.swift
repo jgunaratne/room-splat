@@ -596,7 +596,10 @@ extension CaptureCoordinator: ARSessionDelegate {
         if meshDirty, !meshAnchors.isEmpty, frame.timestamp - lastMeshTime >= Self.meshMinInterval {
             lastMeshTime = frame.timestamp
             meshDirty = false
-            if let mesh = RoomMeshEncoder.encode(Array(meshAnchors.values)) {
+            // Color each vertex from the fused LiDAR cloud (camera-sampled) so the viewer
+            // shades the polygons. Runs on the capture queue, same as the fuser.
+            if let mesh = RoomMeshEncoder.encode(Array(meshAnchors.values),
+                                                 colorAt: { [fuser] in fuser.color(atWorld: $0) }) {
                 ingest.sendRoomMesh(mesh)
             }
         }

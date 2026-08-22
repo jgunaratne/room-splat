@@ -2,21 +2,28 @@
 // viewer's LiDAR tab renders (see web/src/roommesh.js):
 //
 //   [uint32 vertexCount][uint32 indexCount]
-//   [vertexCount x float32 x,y,z][vertexCount x float32 nx,ny,nz][indexCount x uint32]
+//   [vertexCount x float32 x,y,z][vertexCount x float32 nx,ny,nz]
+//   [vertexCount x uint8 r,g,b]        (present only when a color source is given)
+//   [indexCount x uint32]
 //   little-endian, world-space.
 //
 // Each ARMeshAnchor's geometry is in the anchor's local space; vertices are transformed
 // to world by anchor.transform and normals by its rotation. Anchors are concatenated
-// with index offsets so the whole room is one mesh.
+// with index offsets so the whole room is one mesh. When `colorAt` is supplied, each
+// vertex gets a camera-sampled RGB (from the fused LiDAR cloud) so the viewer can shade
+// the polygons instead of drawing a flat wireframe.
 
 import ARKit
 import simd
 
 enum RoomMeshEncoder {
-    static func encode(_ anchors: [ARMeshAnchor]) -> Data? {
+    static func encode(_ anchors: [ARMeshAnchor],
+                       colorAt: ((SIMD3<Float>) -> SIMD3<UInt8>?)? = nil) -> Data? {
         var positions: [SIMD3<Float>] = []
         var normals: [SIMD3<Float>] = []
+        var colors: [SIMD3<UInt8>] = []
         var indices: [UInt32] = []
+        let defaultColor = SIMD3<UInt8>(140, 140, 150)  // for vertices not yet observed
 
         for anchor in anchors {
             let g = anchor.geometry
@@ -46,6 +53,10 @@ enum RoomMeshEncoder {
                 positions.append(SIMD3(world.x, world.y, world.z))
                 let np = nBuf.advanced(by: nOffset + nStride * i).assumingMemoryBound(to: SIMD3<Float>.self).pointee
                 normals.append(simd_normalize(rotation * np))
+                if colorAt != nil {
+                    let w = SIMD3<Float>(world.x, world.y, world.z)
+                    colors.append(colorAt?(w).flatMap { $0 } ?? defaultColor)
+                }
             }
 
             // Faces (ARGeometryElement): triangles, bytesPerIndex is 4 (UInt32) on device.
@@ -63,7 +74,7 @@ enum RoomMeshEncoder {
 
         guard !positions.isEmpty, !indices.isEmpty else { return nil }
 
-        var data = Data(capacity: 8 + positions.count * 24 + indices.count * 4)
+        var data = Data(capacity: 8 + positions.count * 27 + indices.count * 4)
         var vCount = UInt32(positions.count).littleEndian
         var iCount = UInt32(indices.count).littleEndian
         withUnsafeBytes(of: &vCount) { data.append(contentsOf: $0) }
@@ -83,6 +94,7 @@ enum RoomMeshEncoder {
             withUnsafeBytes(of: &y) { data.append(contentsOf: $0) }
             withUnsafeBytes(of: &z) { data.append(contentsOf: $0) }
         }
+        for c in colors { data.append(c.x); data.append(c.y); data.append(c.z) }
         for i in indices { var v = i.littleEndian; withUnsafeBytes(of: &v) { data.append(contentsOf: $0) } }
         return data
     }
