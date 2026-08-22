@@ -20,7 +20,7 @@ enum IngestControl: String, Encodable {
     case sessionAbort = "session_abort"
 }
 
-final class IngestClient {
+final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     static let pointCloudFrameIndex: UInt32 = 0xFFFF_FFFF
     /// Backpressure trigger (SPEC.md §3): above this buffered amount, raise keyframe
     /// thresholds rather than queueing.
@@ -28,13 +28,18 @@ final class IngestClient {
 
     private let serverURL: URL
     private var task: URLSessionWebSocketTask?
-    private let session = URLSession(configuration: .default)
+    private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
 
     private(set) var highestAck: Int = -1
     var onBackpressure: (() -> Void)?
+    /// Socket handshake completed (true) or closed/failed (false).
+    var onConnectionChange: ((Bool) -> Void)?
+    /// Outcome of the most recent frame send: true if it left the socket, false on error.
+    var onTransmit: ((Bool) -> Void)?
 
     init(serverURL: URL) {
         self.serverURL = serverURL
+        super.init()
     }
 
     func connect() {
@@ -51,8 +56,9 @@ final class IngestClient {
         obj["type"] = type.rawValue
         guard let data = try? JSONSerialization.data(withJSONObject: obj),
               let text = String(data: data, encoding: .utf8) else { return }
-        task?.send(.string(text)) { error in
+        task?.send(.string(text)) { [weak self] error in
             if let error { print("ingest control send failed:", error) }
+            self?.onTransmit?(error == nil)
         }
     }
 
@@ -83,8 +89,9 @@ final class IngestClient {
         var header = frameIndex.bigEndian
         var frame = Data(bytes: &header, count: 4)
         frame.append(payload)
-        task?.send(.data(frame)) { error in
+        task?.send(.data(frame)) { [weak self] error in
             if let error { print("ingest binary send failed:", error) }
+            self?.onTransmit?(error == nil)
         }
     }
 
@@ -108,6 +115,7 @@ final class IngestClient {
                 self.receiveLoop()
             case .failure(let error):
                 print("ingest receive failed, reconnecting:", error)
+                self.onConnectionChange?(false)
                 self.reconnect()
             }
         }
@@ -127,5 +135,17 @@ final class IngestClient {
             // Caller resumes sending from highestAck + 1; capture is never blocked
             // on acknowledgment.
         }
+    }
+
+    // MARK: URLSessionWebSocketDelegate (handshake state)
+
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
+                    didOpenWithProtocol protocol: String?) {
+        onConnectionChange?(true)
+    }
+
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
+                    didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        onConnectionChange?(false)
     }
 }

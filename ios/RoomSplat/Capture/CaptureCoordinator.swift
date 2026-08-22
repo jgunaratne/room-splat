@@ -11,10 +11,18 @@ import UIKit
 import simd
 
 final class CaptureCoordinator: NSObject, ObservableObject {
+    enum Link {
+        case offline      // not capturing / socket down
+        case connecting   // capturing, socket handshake not yet complete
+        case connected    // socket open, no frame sent yet
+        case transmitting // frames leaving the socket successfully
+        case error        // a send failed
+    }
+
     @Published private(set) var isCapturing = false
     @Published private(set) var keyframeCount = 0
     @Published private(set) var pointCount = 0
-    @Published private(set) var connected = false
+    @Published private(set) var link: Link = .offline
     @Published private(set) var thermalState: ProcessInfo.ThermalState = .nominal
     @Published private(set) var status = "Idle"
     @Published var serverHost: String {
@@ -72,6 +80,12 @@ final class CaptureCoordinator: NSObject, ObservableObject {
             client.onBackpressure = { [weak self] in
                 self?.queue.async { self?.selector.escalateForBackpressure() }
             }
+            client.onConnectionChange = { [weak self] up in
+                self?.queue.async { self?.handleConnection(up) }
+            }
+            client.onTransmit = { [weak self] ok in
+                self?.queue.async { self?.handleTransmit(ok) }
+            }
             client.connect()
             self.ingest = client
         }
@@ -86,8 +100,8 @@ final class CaptureCoordinator: NSObject, ObservableObject {
             self.keyframeCount = 0
             self.pointCount = 0
             self.isCapturing = true
-            self.connected = true
-            self.status = "Capturing"
+            self.link = .connecting
+            self.status = "Connecting to \(self.serverHost)…"
         }
     }
 
@@ -100,10 +114,35 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         }
         publish {
             self.isCapturing = false
-            self.connected = false
+            self.link = .offline
             self.status = "Stopped"
         }
     }
+
+    // MARK: - connection state
+
+    private func handleConnection(_ up: Bool) {
+        guard isCapturingNow else { return }
+        publish {
+            switch self.link {
+            case .transmitting where up:
+                break
+            default:
+                self.link = up ? .connected : .connecting
+                self.status = up ? "Connected, waiting for frames…" : "Reconnecting…"
+            }
+        }
+    }
+
+    private func handleTransmit(_ ok: Bool) {
+        guard isCapturingNow else { return }
+        publish {
+            self.link = ok ? .transmitting : .error
+            self.status = ok ? "Transmitting" : "Send failed"
+        }
+    }
+
+    private var isCapturingNow: Bool { ingest != nil }
 
     // MARK: - session lifecycle
 

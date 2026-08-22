@@ -23,8 +23,11 @@ struct ContentView: View {
     }
 
     private var statusBar: some View {
-        HStack {
-            Label(coordinator.status, systemImage: coordinator.connected ? "dot.radiowaves.left.and.right" : "circle")
+        HStack(spacing: 8) {
+            Circle()
+                .fill(linkColor)
+                .frame(width: 10, height: 10)
+            Text(coordinator.status)
             Spacer()
             Text(thermalLabel)
         }
@@ -32,6 +35,16 @@ struct ContentView: View {
         .foregroundStyle(.white)
         .padding(8)
         .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var linkColor: Color {
+        switch coordinator.link {
+        case .offline: return .gray
+        case .connecting: return .yellow
+        case .connected: return .blue
+        case .transmitting: return .green
+        case .error: return .red
+        }
     }
 
     private var controls: some View {
