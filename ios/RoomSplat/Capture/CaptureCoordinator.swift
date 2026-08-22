@@ -8,6 +8,7 @@
 import ARKit
 import AVFoundation
 import CoreImage
+import ImageIO
 import UIKit
 import simd
 
@@ -79,7 +80,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private var packageWriter: PackageWriter?
     private let governor = ThermalGovernor()
     private let fuser = PointCloudFuser()
-    private let ciContext = CIContext(options: nil)
+    private let ciContext = CIContext(options: [.cacheIntermediates: false])
+    private let jpegColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    private static let jpegLongEdge: CGFloat = 1600  // SPEC.md §6
 
     // Camera locks (SPEC.md §3): lock exposure + white balance, fixed focus pre-session.
     // Assert every frame; record a warning in session metadata if any lock is lost.
@@ -341,9 +344,20 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     }
 
     private func jpegData(from pixelBuffer: CVPixelBuffer) -> Data? {
-        let ci = CIImage(cvPixelBuffer: pixelBuffer)
-        guard let cg = ciContext.createCGImage(ci, from: ci.extent) else { return nil }
-        return UIImage(cgImage: cg).jpegData(compressionQuality: 0.7)
+        var image = CIImage(cvPixelBuffer: pixelBuffer)
+        // Downscale to a 1600 px long edge (SPEC.md §6) BEFORE encoding. The old path
+        // rendered a full-resolution CGImage and encoded it with UIImage.jpegData on the
+        // capture queue, which stalled the keyframe loop (slow transmission + laggy PiP).
+        // Scaling first plus CIContext.jpegRepresentation cuts both encode time and bytes.
+        let longEdge = max(image.extent.width, image.extent.height)
+        if longEdge > Self.jpegLongEdge {
+            let s = Self.jpegLongEdge / longEdge
+            image = image.transformed(by: CGAffineTransform(scaleX: s, y: s))
+        }
+        let options: [CIImageRepresentationOption: Any] = [
+            CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.8
+        ]
+        return ciContext.jpegRepresentation(of: image, colorSpace: jpegColorSpace, options: options)
     }
 
     private func setStatus(_ text: String) { publish { self.status = text } }
