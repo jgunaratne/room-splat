@@ -10,7 +10,7 @@ struct CameraPreview: UIViewRepresentable {
     func makeUIView(context: Context) -> ARSCNView {
         let view = ARSCNView(frame: .zero)
         view.automaticallyUpdatesLighting = true
-        coordinator.attach(view.session)
+        coordinator.attach(view)
         return view
     }
 

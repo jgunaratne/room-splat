@@ -129,6 +129,15 @@ struct ContentView: View {
                 }
             }
 
+            if CaptureCoordinator.deviceSupported {
+                Toggle(isOn: $coordinator.showMesh) {
+                    Label("LiDAR mesh overlay", systemImage: "grid")
+                        .font(.footnote)
+                }
+                .foregroundStyle(.white)
+                .tint(.green)
+            }
+
             Button(action: toggle) {
                 Text(coordinator.isCapturing ? "Stop Capture" : "Start Capture")
                     .frame(maxWidth: .infinity)
