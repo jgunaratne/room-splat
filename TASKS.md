@@ -126,8 +126,9 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
 - [x] **Capability report + thermal_state messages** on the wire; honor server stage
   assignment (no hardcoded split). *Area:* `Stream/`, `Capture/`.
   — @antigravity, 2026-08-22
-- [ ] **mDNS discovery** of the server on the local subnet (host setting already exists).
+- [x] **mDNS discovery** of the server on the local subnet (host setting already exists).
   *Area:* `Stream/`, settings UI.
+  — @antigravity, 2026-08-22
 
 ### M5 — on-device preview + coverage (⛔ after M4 gate)
 

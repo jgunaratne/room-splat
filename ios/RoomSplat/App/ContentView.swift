@@ -4,6 +4,8 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var coordinator = CaptureCoordinator()
 
+    @StateObject private var discovery = ServerDiscovery()
+
     var body: some View {
         ZStack {
             if CaptureCoordinator.deviceSupported {
@@ -20,6 +22,8 @@ struct ContentView: View {
             }
             .padding()
         }
+        .onAppear { discovery.start() }
+        .onDisappear { discovery.stop() }
     }
 
     private var statusBar: some View {
@@ -63,12 +67,37 @@ struct ContentView: View {
             .disabled(coordinator.isCapturing)
 
             if coordinator.captureMode == .stream {
-                TextField("server host, e.g. 192.168.1.50:8000", text: $coordinator.serverHost)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                    .disabled(coordinator.isCapturing)
+                VStack(spacing: 6) {
+                    TextField("server host, e.g. 192.168.1.50:8000", text: $coordinator.serverHost)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        .disabled(coordinator.isCapturing)
+
+                    if !discovery.discoveredServers.isEmpty && !coordinator.isCapturing {
+                        HStack {
+                            Text("Discovered:")
+                                .font(.caption2)
+                                .foregroundStyle(.white.opacity(0.8))
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(discovery.discoveredServers) { s in
+                                        Button(action: { coordinator.serverHost = s.endpointString }) {
+                                            Text(s.name)
+                                                .font(.caption2.bold())
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.white.opacity(0.2))
+                                                .clipShape(Capsule())
+                                        }
+                                        .foregroundStyle(.white)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Button(action: toggle) {
