@@ -1,0 +1,35 @@
+[project]
+name = "roomsplat-server"
+version = "0.1.0"
+description = "RoomSplat desktop server: live ingest, progressive training, viewer host"
+requires-python = ">=3.11"
+
+# The GPU-free pipeline (data contract, ingest, chunking, manifest, replay, viewer
+# host) needs only these. Training on the 5090 additionally requires torch + gsplat,
+# pinned below and recorded in README.md (SPEC.md §7): those extras are intentionally
+# NOT default-installed so tests and CI run without CUDA.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "numpy>=1.26",
+    "websockets>=12",
+]
+
+[project.optional-dependencies]
+# Pin the exact working combination on the 5090 box (do not widen these ranges
+# without re-validating M2 — gsplat is sensitive to torch/CUDA, SPEC.md §7).
+train = [
+    "torch==2.5.1",
+    "gsplat==1.4.0",
+]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools]
+packages = ["app", "ingest", "train", "simplify", "roomsplat"]

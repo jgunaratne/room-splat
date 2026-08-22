@@ -1,0 +1,16 @@
+# server
+server/data/
+server/**/__pycache__/
+server/**/*.egg-info/
+.pytest_cache/
+
+# web
+web/node_modules/
+web/dist/
+
+# vendor is read-only reference; clone locally, don't commit
+vendor/
+
+# os
+.DS_Store
+.jtui/

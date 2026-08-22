@@ -1,0 +1,156 @@
+"""Session manager: owns live sessions, drives training, broadcasts manifests.
+
+Transport-agnostic core shared by the WebSocket handlers (main.py) and --replay
+(replay.py). It ties together the ingest disk mirror (LiveSession) and the
+progressive trainer, and fans manifest diffs out to connected viewers.
+
+Backend selection is not hardcoded per feature: set ROOMSPLAT_BACKEND=gsplat on the
+5090 box; tests and GPU-free runs use "synthetic".
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from ingest.session import LiveSession
+from roomsplat.manifest import Manifest
+from roomsplat.package import CameraModel
+from train.backends import make_backend
+from train.progressive import TICK_SECONDS, ProgressiveTrainer
+
+log = logging.getLogger("roomsplat.app")
+
+POINT_CLOUD_RESEND_EVERY = 50  # keyframes (§3)
+
+
+class SessionRuntime:
+    def __init__(self, manager: "SessionManager", session: LiveSession, backend_name: str):
+        self.manager = manager
+        self.session = session
+        self.backend_name = backend_name
+        self.assets_dir = manager.assets_dir / session.session_id
+        self.manifest = Manifest(session_id=session.session_id)
+        self.trainer: ProgressiveTrainer | None = None
+        self._tick_task: asyncio.Task | None = None
+        self._frames_since_cloud = 0
+
+    def _ensure_trainer(self) -> None:
+        if self.trainer is not None or self.session.point_cloud is None:
+            return
+        xyz, rgb = self.session.point_cloud
+        backend = make_backend(self.backend_name, seed_xyz=xyz, seed_rgb=rgb,
+                               package_root=self.session.root)
+        self.trainer = ProgressiveTrainer(
+            backend=backend, manifest=self.manifest, assets_dir=self.assets_dir
+        )
+        self.trainer.set_point_cloud(xyz, rgb, self.session.point_cloud_version)
+
+    def on_keyframe_pose(self, transform_matrix: list[list[float]]) -> None:
+        if self.trainer is not None:
+            self.trainer.add_keyframe(transform_matrix)
+
+    def on_image(self) -> None:
+        self._frames_since_cloud += 1
+
+    def on_point_cloud(self, xyz: np.ndarray, rgb: np.ndarray, version: int) -> None:
+        self._ensure_trainer()
+        if self.trainer is not None:
+            self.trainer.set_point_cloud(xyz, rgb, version)
+        self._frames_since_cloud = 0
+
+    async def start(self) -> None:
+        self._tick_task = asyncio.create_task(self._tick_loop())
+
+    async def _tick_loop(self) -> None:
+        try:
+            while not self.session.is_complete:
+                await asyncio.sleep(TICK_SECONDS)
+                self._ensure_trainer()
+                if self.trainer is None:
+                    continue
+                diff = await asyncio.to_thread(self.trainer.tick)
+                await self.manager.broadcast(diff)
+        except asyncio.CancelledError:
+            pass
+
+    async def stop(self) -> None:
+        if self._tick_task:
+            self._tick_task.cancel()
+            try:
+                await self._tick_task
+            except asyncio.CancelledError:
+                pass
+
+
+class SessionManager:
+    def __init__(self, data_dir: Path, assets_dir: Path, backend_name: str | None = None):
+        self.data_dir = Path(data_dir)
+        self.assets_dir = Path(assets_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.assets_dir.mkdir(parents=True, exist_ok=True)
+        self.backend_name = backend_name or os.environ.get("ROOMSPLAT_BACKEND", "synthetic")
+        self.sessions: dict[str, SessionRuntime] = {}
+        self.viewers: set[Any] = set()
+
+    # ---- viewer fan-out -----------------------------------------------------
+
+    async def add_viewer(self, ws: Any) -> None:
+        self.viewers.add(ws)
+        # A late-joining browser gets the full current manifest immediately (§4).
+        for rt in self.sessions.values():
+            await ws.send_text(json.dumps(rt.manifest.snapshot()))
+
+    def remove_viewer(self, ws: Any) -> None:
+        self.viewers.discard(ws)
+
+    async def broadcast(self, message: dict) -> None:
+        payload = json.dumps(message)
+        dead = []
+        for ws in list(self.viewers):
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.viewers.discard(ws)
+
+    # ---- ingest -------------------------------------------------------------
+
+    async def open_session(self, msg: dict) -> SessionRuntime:
+        session_id = msg["session_id"]
+        cam = msg["camera"]
+        camera = CameraModel.from_dict(cam)
+        capture = msg.get("capture", {})
+        capture.setdefault("schema_version", 2)
+        capture.setdefault("session_id", session_id)
+        capture.setdefault("device_model", msg.get("device_model", "unknown"))
+        capture.setdefault("captured_at", msg.get("captured_at", ""))
+        capture.setdefault("source", "stream")
+        root = self.data_dir / f"{session_id}.roomsplat"
+        session = LiveSession(session_id, root, capture, camera)
+        rt = SessionRuntime(self, session, self.backend_name)
+        self.sessions[session_id] = rt
+        await rt.start()
+        log.info("stage=session_open session=%s root=%s", session_id, root)
+        return rt
+
+    async def close_session(self, session_id: str) -> None:
+        rt = self.sessions.get(session_id)
+        if not rt:
+            return
+        rt.session.complete()
+        await rt.stop()
+        # final tick to flush any remaining dirty cells
+        if rt.trainer is not None:
+            diff = rt.trainer.tick()
+            await self.broadcast(diff)
+        await self.broadcast({"type": "session_complete", "session_id": session_id})
+        log.info("stage=session_complete session=%s frames=%d",
+                 session_id, rt.session.stats.frame_count)
