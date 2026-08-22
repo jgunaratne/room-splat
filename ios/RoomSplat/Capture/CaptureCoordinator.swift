@@ -33,6 +33,22 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
     }
 
+    /// Map a user-entered host to a WebSocket URL: https->wss, http->ws, bare host->ws,
+    /// preserving any explicit ws(s):// scheme. Trailing slashes are trimmed.
+    static func normalizeWebSocketURL(_ host: String) -> String {
+        var s = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        while s.hasSuffix("/") { s.removeLast() }
+        let lower = s.lowercased()
+        if lower.hasPrefix("wss://") || lower.hasPrefix("ws://") {
+            return s
+        } else if lower.hasPrefix("https://") {
+            return "wss://" + s.dropFirst("https://".count)
+        } else if lower.hasPrefix("http://") {
+            return "ws://" + s.dropFirst("http://".count)
+        }
+        return "ws://" + s
+    }
+
     private weak var arSession: ARSession?
     private var selector = KeyframeSelector()
     private var ingest: IngestClient?
@@ -66,8 +82,11 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         let host = serverHost.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty else { setStatus("Enter a server host first"); return }
         guard Self.deviceSupported else { setStatus("No LiDAR / sceneDepth on this device"); return }
-        // Honor an explicit scheme (wss:// for TLS endpoints); default bare hosts to ws://.
-        let urlString = host.contains("://") ? host : "ws://\(host)"
+        // URLSessionWebSocketTask only accepts ws:// or wss:// — normalize a pasted
+        // http(s):// endpoint (e.g. https://sea.octo80.com) to the WebSocket scheme,
+        // and default a bare host to ws://. Trailing slashes are stripped so
+        // appendingPathComponent("ws/ingest") doesn't produce a double slash.
+        let urlString = Self.normalizeWebSocketURL(host)
         guard let arSession, let url = URL(string: urlString) else {
             setStatus("Bad server host"); return
         }
