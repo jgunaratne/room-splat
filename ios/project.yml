@@ -20,9 +20,19 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.roomsplat.RoomSplat
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_NSCameraUsageDescription: "RoomSplat uses the camera and LiDAR to capture the room."
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "RoomSplat streams captured frames to your local ingest server."
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         TARGETED_DEVICE_FAMILY: "1,2"
-        GENERATE_INFOPLIST_FILE: YES
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: RoomSplat/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSCameraUsageDescription: "RoomSplat uses the camera and LiDAR to capture the room."
+        NSLocalNetworkUsageDescription: "RoomSplat streams captured frames to your local ingest server."
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Development: allow ws:// and self-signed wss:// to a LAN/self-hosted ingest
+        # server. A production build talking only to a valid TLS origin can drop this.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
