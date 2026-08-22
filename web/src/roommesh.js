@@ -13,7 +13,7 @@ export class RoomMesh {
     this.mesh = null;
     this.version = -1;
     this._url = null;
-    this.visible = false;
+    this.visible = true; // shown by default (also overlaid on the splat view)
     // Wireframe, to mirror the phone's ARKit scene-reconstruction triangle overlay. As
     // more anchors stream in, each update replaces the mesh with the fuller triangle set,
     // so the wireframe visibly fills out (matching what the operator sees on-device).
