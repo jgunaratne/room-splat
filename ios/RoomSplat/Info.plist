@@ -27,6 +27,10 @@
 	<string>RoomSplat uses the camera and LiDAR to capture the room.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>RoomSplat streams captured frames to your local ingest server.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
