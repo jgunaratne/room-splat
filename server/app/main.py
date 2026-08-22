@@ -86,8 +86,8 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
                 # from scratch (server broadcasts "reset" so every viewer clears too).
                 text = await ws.receive_text()
                 try:
-                    if json.loads(text).get("type") == "reset":
-                        await mgr.reset()
+                    ctl = json.loads(text)
+                    await _handle_viewer_control(mgr, ws, ctl)
                 except (ValueError, AttributeError):
                     pass
         except WebSocketDisconnect:
@@ -116,13 +116,52 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
         return Response(mesh, media_type="application/octet-stream",
                         headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
+    @app.get("/projects")
+    async def list_projects():
+        # Saved projects for the viewer's load dropdown (splat cells + LiDAR mesh).
+        return app.state.manager.list_projects()
+
     # /assets serves versioned, immutable cell + cloud URLs referenced by manifests.
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+    # /projects-assets serves the immutable snapshot copies of saved projects.
+    mgr = app.state.manager
+    mgr.projects_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/projects-assets", StaticFiles(directory=str(mgr.projects_dir)), name="projects_assets")
     if WEB_DIST.is_dir():
         app.mount("/", StaticFiles(directory=str(WEB_DIST), html=True), name="web")
 
     return app
+
+
+async def _handle_viewer_control(mgr: SessionManager, ws: WebSocket, ctl: dict) -> None:
+    mtype = ctl.get("type")
+    if mtype == "reset":
+        await mgr.reset()
+    elif mtype == "save_project":
+        meta = mgr.save_project(ctl.get("session_id", ""), ctl.get("name", ""))
+        if meta is None:
+            await ws.send_text(json.dumps({"type": "log", "level": "warn",
+                "msg": "save failed: no active scene to save"}))
+            return
+        # Refresh every viewer's project list and confirm on the console.
+        await mgr.broadcast({"type": "projects", "projects": mgr.list_projects()})
+        await mgr.broadcast_log(f"saved project '{meta['name']}' ({meta['cells']} cells)")
+    elif mtype == "load_project":
+        snap, room_url = mgr.load_project(ctl.get("id", ""))
+        if snap is None:
+            await ws.send_text(json.dumps({"type": "log", "level": "warn",
+                "msg": "load failed: project not found"}))
+            return
+        # Send only to the requesting viewer so one browser can inspect a saved scene
+        # without yanking others off the live capture.
+        await ws.send_text(json.dumps(snap))
+        if room_url:
+            await ws.send_text(json.dumps({
+                "type": "room_mesh", "session_id": snap.get("session_id"),
+                "url": room_url, "version": snap.get("tick", 1) or 1}))
+        await ws.send_text(json.dumps({"type": "log",
+            "msg": f"loaded project ({len(snap.get('cells', []))} cells)"}))
 
 
 async def _handle_control(mgr: SessionManager, ws: WebSocket, msg: dict, current: str | None) -> str | None:
@@ -142,6 +181,12 @@ async def _handle_control(mgr: SessionManager, ws: WebSocket, msg: dict, current
         meta = KeyframeMeta.from_msg(msg)
         session.on_keyframe_meta(meta)
         rt.on_keyframe_pose(meta.transform_matrix)
+        # Trace the phone's path in near real time: push each pose to viewers as it lands
+        # rather than only on the 2 s manifest tick, so the trajectory leads the splat
+        # detail that fills in behind it as the GPU trains (SPEC.md §4).
+        await mgr.broadcast({
+            "type": "live_pose", "session_id": session.session_id, "pose": meta.transform_matrix,
+        })
     elif mtype == ControlType.THERMAL_STATE:
         session.on_thermal_state(float(msg.get("t", 0.0)), str(msg.get("state", "")))
     elif mtype == ControlType.TRACKING_WARNING:
