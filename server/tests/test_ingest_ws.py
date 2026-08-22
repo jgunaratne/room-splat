@@ -160,3 +160,49 @@ def test_ingest_reconnect_resumes_from_highest_ack(tmp_path):
     pkg.validate()
     assert len(pkg.frames) == 3
     assert pkg.capture["frame_count"] == 3
+
+
+def test_ingest_capability_report_and_thermal_state(tmp_path):
+    """Test capability negotiation and thermal event recording over the wire."""
+    manager = SessionManager(tmp_path / "captures", tmp_path / "assets", backend_name="synthetic")
+    app = create_app(manager)
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws/ingest") as ingest:
+        ingest.send_text(json.dumps({
+            "type": "session_open",
+            "session_id": "cap-uuid",
+            "device_model": "iPhone17,2",
+            "captured_at": "2026-08-22T10:14:00Z",
+            "camera": {"camera_model": "OPENCV", "fl_x": 1400, "fl_y": 1400,
+                       "cx": 800, "cy": 600, "w": 1600, "h": 1200},
+        }))
+        ack0 = json.loads(ingest.receive_text())
+        assert ack0["type"] == "ack"
+
+        # Send capability report
+        ingest.send_text(json.dumps({
+            "type": "capability_report",
+            "device_model": "iPhone17,2",
+            "lidar": True,
+            "scene_depth": True,
+            "preview_training_supported": True,
+        }))
+        stage_assign = json.loads(ingest.receive_text())
+        assert stage_assign["type"] == "stage_assignment"
+        assert stage_assign["preview_training"] is True
+        assert stage_assign["lidar_fusion"] is True
+
+        # Send thermal state update
+        ingest.send_text(json.dumps({
+            "type": "thermal_state",
+            "t": 12.5,
+            "state": "serious",
+        }))
+
+        ingest.send_bytes(encode_binary(POINT_CLOUD_FRAME_INDEX, _cloud_bytes(tmp_path)))
+        ingest.send_text(json.dumps({"type": "session_complete", "session_id": "cap-uuid"}))
+
+    pkg = RoomSplatPackage.open(tmp_path / "captures" / "cap-uuid.roomsplat")
+    pkg.validate()
+    assert pkg.capture["thermal_events"] == [{"t": 12.5, "state": "serious"}]

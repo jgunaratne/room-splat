@@ -127,6 +127,17 @@ async def _handle_control(mgr: SessionManager, ws: WebSocket, msg: dict, current
         session.on_tracking_warning(str(msg.get("message", "")))
     elif mtype == ControlType.CAPABILITY_REPORT:
         log.info("stage=capability session=%s report=%s", current, msg)
+        # Server determines stage assignment based on phone capabilities (SPEC.md §2):
+        # Full training and chunking always run on desktop; preview training is enabled
+        # on device only if supported and server doesn't withhold it.
+        assignment = {
+            "type": ControlType.STAGE_ASSIGNMENT,
+            "preview_training": bool(msg.get("preview_training_supported", False)),
+            "coverage_analysis": True,
+            "keyframe_selection": True,
+            "lidar_fusion": True,
+        }
+        await ws.send_text(json.dumps(assignment))
     elif mtype == ControlType.SESSION_COMPLETE:
         await mgr.close_session(current)
         return None
