@@ -39,10 +39,10 @@ const fly = new PointerLockControls(camera, renderer.domElement);
 fly.pointerSpeed = 0.8;                 // mouse sensitivity
 
 const keys = new Set();
-const MIN_SPEED = 0.3, MAX_SPEED = 40;  // metres/second (wheel-adjustable)
-let moveSpeed = 2.5;
+const moveSpeed = 6;                     // metres/second (WASD)
 const BOOST = 4;                         // Shift multiplier
 const ACCEL = 12;                        // velocity ramp (1/s) for precise taps, fast holds
+const ZOOM_STEP = 0.5;                   // metres dollied per wheel notch
 const velocity = new THREE.Vector3();
 const MOVE_KEYS = new Set(["w", "a", "s", "d", "q", "e", " ", "control"]);
 
@@ -57,13 +57,13 @@ addEventListener("keydown", (e) => {
 addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 addEventListener("blur", () => { keys.clear(); velocity.set(0, 0, 0); });
 
-// Wheel adjusts fly speed (orbit keeps the wheel for zoom).
+// Wheel zooms by dollying the camera along the view direction (orbit keeps its own zoom).
 renderer.domElement.addEventListener("wheel", (e) => {
   if (mode !== "fly") return;
   e.preventDefault();
-  moveSpeed = THREE.MathUtils.clamp(moveSpeed * (e.deltaY < 0 ? 1.15 : 1 / 1.15),
-                                    MIN_SPEED, MAX_SPEED);
-  refreshModeLabel();
+  const dir = camera.getWorldDirection(new THREE.Vector3());
+  const step = ZOOM_STEP * (e.deltaY < 0 ? 1 : -1) * (keys.has("shift") ? BOOST : 1);
+  camera.position.addScaledVector(dir, step);
 }, { passive: false });
 
 function applyFlyMovement(dt) {
@@ -175,9 +175,7 @@ function clearScene() {
   logLine("scene reset — ready for a new capture", "ok");
 }
 function refreshModeLabel() {
-  modeBtn.textContent = mode === "fly"
-    ? `camera: fly · ${moveSpeed.toFixed(1)} m/s`
-    : `camera: ${mode}`;
+  modeBtn.textContent = `camera: ${mode}`;
 }
 function setMode(m) {
   mode = m;
