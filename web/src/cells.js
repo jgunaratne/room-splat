@@ -27,6 +27,7 @@ export class CellManager {
     this.scene = scene;
     this.slots = new Map();
     this._active = 0;
+    this._visible = true;
   }
 
   applyManifest(cells) {
@@ -77,6 +78,7 @@ export class CellManager {
 
   _mount(slot, mesh, version) {
     mesh.opacity = 0;
+    mesh.visible = this._visible;
     this.scene.add(mesh);
     const old = slot.mesh;
     slot.mesh = mesh;
@@ -93,6 +95,11 @@ export class CellManager {
   }
 
   get count() { return this.slots.size; }
+
+  setVisible(on) {
+    for (const slot of this.slots.values()) if (slot.mesh) slot.mesh.visible = on;
+    this._visible = on;
+  }
 
   clear() {
     for (const slot of this.slots.values()) {

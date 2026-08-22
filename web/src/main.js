@@ -4,6 +4,7 @@ import { PointCloudLayer } from "./pointcloud.js";
 import { CellManager } from "./cells.js";
 import { LiveFrustum } from "./frustum.js";
 import { CoverageLayer } from "./coverage.js";
+import { RoomMesh } from "./roommesh.js";
 
 // The viewer is a pure consumer of the manifest (SPEC.md §4): it holds no derived
 // state the server cannot rebuild. A refresh mid-session recovers from the latest
@@ -68,11 +69,45 @@ function applyFlyMovement(dt) {
 addEventListener("keydown", (e) => { if (e.key === "Shift") keys.add("shift"); });
 addEventListener("keyup", (e) => { if (e.key === "Shift") keys.delete("shift"); });
 
+// Lights for the LiDAR room mesh (splats/points are unlit and ignore these).
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.1));
+const keyLight = new THREE.DirectionalLight(0xffffff, 0.6);
+keyLight.position.set(3, 5, 2);
+scene.add(keyLight);
+
 const cloud = new PointCloudLayer(scene);
 const cells = new CellManager(scene);
 const frustum = new LiveFrustum(scene);
 const coverage = new CoverageLayer(scene);
+const roomMesh = new RoomMesh(scene);
 let cellSize = null; // inferred from the first trained cell's bounds
+
+// Two viewing modes (top tabs): the Gaussian-splat scene, and the LiDAR room (a solid
+// mesh from ARKit scene reconstruction, falling back to the fused point cloud).
+let tab = "splat";
+let roomMeshInfo = null; // {session_id, url, version} from the latest room_mesh notice
+const tabSplat = document.getElementById("tabSplat");
+const tabLidar = document.getElementById("tabLidar");
+function setTab(t) {
+  tab = t;
+  tabSplat.classList.toggle("active", t === "splat");
+  tabLidar.classList.toggle("active", t === "lidar");
+  const splat = t === "splat";
+  cells.setVisible(splat);
+  coverage.setEnabled(splat && coverageOn);
+  roomMesh.setVisible(!splat);
+  // In LiDAR mode the point cloud IS the room, so make it denser-looking; in splat mode
+  // it's just the under-layer, kept fine.
+  cloud.setPointSize(splat ? 0.015 : 0.03);
+  if (!splat && roomMeshInfo) {
+    roomMesh.update(roomMeshInfo.url, roomMeshInfo.version).then((info) => {
+      if (info) logLine(`LiDAR room mesh: ${info.triangles.toLocaleString()} triangles`);
+    });
+  }
+  logLine(`view: ${splat ? "Gaussian Splat" : "LiDAR room"}`, "dim");
+}
+tabSplat.onclick = () => setTab("splat");
+tabLidar.onclick = () => setTab("lidar");
 
 // Two camera modes (SPEC.md §4): follow tracks the live ARKit pose while a session is
 // open; free is a standard orbit. Switch to free on session_complete.
@@ -103,6 +138,8 @@ function clearScene() {
   cloud.clear();
   coverage.clear();
   frustum.clear();
+  roomMesh.clear();
+  roomMeshInfo = null;
   cellSize = null;
   lastCloudUrl = null;
   followTarget = null;
@@ -215,6 +252,17 @@ function connect() {
     if (msg.type === "manifest_update") onManifest(msg);
     else if (msg.type === "reset") {
       clearScene();
+    } else if (msg.type === "room_mesh") {
+      roomMeshInfo = {
+        session_id: msg.session_id,
+        url: `/room/${msg.session_id}.bin?v=${msg.version}`,
+        version: msg.version,
+      };
+      if (tab === "lidar") {
+        roomMesh.update(roomMeshInfo.url, roomMeshInfo.version).then((info) => {
+          if (info) logLine(`LiDAR room mesh: ${info.triangles.toLocaleString()} triangles`);
+        });
+      }
     } else if (msg.type === "log") {
       logLine(msg.msg, msg.level === "warn" ? "warn" : "info");
     } else if (msg.type === "live_pose") {

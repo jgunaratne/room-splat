@@ -20,6 +20,7 @@ from roomsplat.protocol import (
     ControlType,
     KeyframeMeta,
     decode_binary,
+    is_mesh,
     is_point_cloud,
     is_preview,
 )
@@ -104,6 +105,17 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
             return Response(status_code=404)
         return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
+    @app.get("/room/{session_id}.bin")
+    async def room_mesh(session_id: str):
+        # Latest LiDAR room mesh for the viewer's LiDAR tab. Versioned via ?v= query, so
+        # it caches immutably per version.
+        rt = app.state.manager.sessions.get(session_id)
+        mesh = rt.session.room_mesh if rt else None
+        if not mesh:
+            return Response(status_code=404)
+        return Response(mesh, media_type="application/octet-stream",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
     # /assets serves versioned, immutable cell + cloud URLs referenced by manifests.
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
@@ -167,6 +179,13 @@ async def _handle_binary(mgr: SessionManager, ws: WebSocket, current: str | None
         version = rt.session.on_point_cloud(xyz, rgb)
         rt.on_point_cloud(xyz, rgb, version)
         await mgr.broadcast_log(f"LiDAR cloud v{version}: {len(xyz):,} points")
+    elif is_mesh(frame_index):
+        # ARKit room mesh for the LiDAR tab: store and notify (fetched over HTTP).
+        version = rt.session.on_room_mesh(payload)
+        await mgr.broadcast({
+            "type": "room_mesh", "session_id": rt.session.session_id, "version": version,
+        })
+        await mgr.broadcast_log(f"LiDAR room mesh v{version}: {len(payload):,} bytes")
     elif is_preview(frame_index):
         # Timer-driven preview: refresh the PiP only. Not mirrored, not trained, not
         # acked (best-effort, so it never competes with keyframes on a congested link).

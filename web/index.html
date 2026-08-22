@@ -42,9 +42,23 @@
       #console .ok { color: #7ddc8f; }
       #console .warn { color: #ffb454; }
       #console .dim { color: #6b7280; }
+      #tabs {
+        position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20;
+        display: flex; gap: 2px; background: rgba(20,22,26,.72); padding: 3px;
+        border-radius: 10px;
+      }
+      #tabs button {
+        font: 12px/1 ui-monospace, monospace; color: #cfd2d6; background: transparent;
+        border: 0; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      }
+      #tabs button.active { background: #2b6cf0; color: #fff; }
     </style>
   </head>
   <body>
+    <div id="tabs">
+      <button id="tabSplat" class="active">Gaussian Splat</button>
+      <button id="tabLidar">LiDAR</button>
+    </div>
     <div id="hud">
       <div><b>RoomSplat</b> viewer</div>
       <div id="status">connecting…</div>

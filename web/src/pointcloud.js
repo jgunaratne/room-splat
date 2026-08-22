@@ -13,6 +13,12 @@ export class PointCloudLayer {
     this.points = null;
     this.version = -1;
     this._url = null;
+    this._size = 0.015;
+  }
+
+  setPointSize(size) {
+    this._size = size;
+    if (this.points) this.points.material.size = size;
   }
 
   // Idempotent: only fetch a strictly newer version (versioned, immutable URLs).
@@ -38,7 +44,7 @@ export class PointCloudLayer {
     const geom = new THREE.BufferGeometry();
     geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    const mat = new THREE.PointsMaterial({ size: 0.015, vertexColors: true });
+    const mat = new THREE.PointsMaterial({ size: this._size, vertexColors: true });
     const next = new THREE.Points(geom, mat);
     if (this.points) this.scene.remove(this.points);
     this.points = next;

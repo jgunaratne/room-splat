@@ -24,6 +24,7 @@ enum IngestControl: String, Encodable {
 final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     static let pointCloudFrameIndex: UInt32 = 0xFFFF_FFFF
     static let previewFrameIndex: UInt32 = 0xFFFF_FFFE
+    static let meshFrameIndex: UInt32 = 0xFFFF_FFFD
     /// Backpressure trigger (SPEC.md §3): above this buffered amount, raise keyframe
     /// thresholds rather than queueing.
     static let backpressureBytes = 8 * 1024 * 1024
@@ -95,6 +96,11 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
 
     func sendPointCloud(_ data: Data) {
         sendBinary(frameIndex: Self.pointCloudFrameIndex, payload: data)
+    }
+
+    /// ARKit scene-reconstruction room mesh for the viewer's LiDAR tab.
+    func sendRoomMesh(_ data: Data) {
+        sendBinary(frameIndex: Self.meshFrameIndex, payload: data)
     }
 
     /// Low-res preview frame for the viewer PiP. Best-effort: skipped under backpressure
