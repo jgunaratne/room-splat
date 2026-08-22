@@ -94,6 +94,10 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     // the phone. Only the preview is rotated — training keyframes stay native (§5).
     private var captureOrientation: CGImagePropertyOrientation = .right
     private var orientationObserver: NSObjectProtocol?
+    // ARKit scene-reconstruction mesh anchors, streamed to the viewer's LiDAR tab.
+    private var meshAnchors: [UUID: ARMeshAnchor] = [:]
+    private var lastMeshTime: TimeInterval = 0
+    private static let meshInterval: TimeInterval = 3.0
 
     // Camera locks (SPEC.md §3): lock exposure + white balance, fixed focus pre-session.
     // Assert every frame; record a warning in session metadata if any lock is lost.
@@ -155,6 +159,8 @@ final class CaptureCoordinator: NSObject, ObservableObject {
                 self.pendingSessionOpen = nil
                 self.latestCloud = nil
                 self.lastKeyframeTime = 0
+                self.meshAnchors = [:]
+                self.lastMeshTime = 0
                 self.packageWriter = nil
 
                 let client = IngestClient(serverURL: url)
@@ -211,6 +217,11 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         let config = ARWorldTrackingConfiguration()
         config.frameSemantics = .sceneDepth
         config.worldAlignment = .gravity
+        // Scene reconstruction gives a triangle mesh of the room for the viewer's LiDAR
+        // tab (in addition to the fused point cloud used for splat seeding).
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            config.sceneReconstruction = .mesh
+        }
         arSession.run(config, options: [.resetTracking, .removeExistingAnchors])
         applyCameraLocks()
         governor.start()
@@ -558,6 +569,14 @@ extension CaptureCoordinator: ARSessionDelegate {
             }
         }
 
+        // Stream the ARKit room mesh on its own cadence for the viewer's LiDAR tab.
+        if !meshAnchors.isEmpty, frame.timestamp - lastMeshTime >= Self.meshInterval {
+            lastMeshTime = frame.timestamp
+            if let mesh = RoomMeshEncoder.encode(Array(meshAnchors.values)) {
+                ingest.sendRoomMesh(mesh)
+            }
+        }
+
         if minKeyframeInterval > 0, frame.timestamp - lastKeyframeTime < minKeyframeInterval {
             return
         }
@@ -642,5 +661,17 @@ extension CaptureCoordinator: ARSessionDelegate {
 
     func session(_ session: ARSession, didFailWithError error: Error) {
         setStatus("AR error: \(error.localizedDescription)")
+    }
+
+    // Collect ARKit scene-reconstruction mesh anchors for the LiDAR room view. These
+    // callbacks run on the same background queue as didUpdate, so mutation is serial.
+    func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+        for case let m as ARMeshAnchor in anchors { meshAnchors[m.identifier] = m }
+    }
+    func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
+        for case let m as ARMeshAnchor in anchors { meshAnchors[m.identifier] = m }
+    }
+    func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
+        for case let m as ARMeshAnchor in anchors { meshAnchors.removeValue(forKey: m.identifier) }
     }
 }

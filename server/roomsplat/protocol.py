@@ -38,6 +38,10 @@ POINT_CLOUD_FRAME_INDEX = 0xFFFFFFFF
 # never mirrored to disk, counted as a keyframe, or trained on. Sent on a timer so the
 # PiP stays responsive even when the operator holds still (keyframes are movement-gated).
 PREVIEW_FRAME_INDEX = 0xFFFFFFFE
+# frame_index sentinel for the ARKit scene-reconstruction room mesh (LiDAR tab). Payload
+# is [u32 vertexCount][u32 indexCount][verts f32*3][normals f32*3][indices u32],
+# little-endian, world-space. Resent periodically as the room map grows.
+MESH_FRAME_INDEX = 0xFFFFFFFD
 
 
 def encode_binary(frame_index: int, payload: bytes) -> bytes:
@@ -57,6 +61,10 @@ def is_point_cloud(frame_index: int) -> bool:
 
 def is_preview(frame_index: int) -> bool:
     return frame_index == PREVIEW_FRAME_INDEX
+
+
+def is_mesh(frame_index: int) -> bool:
+    return frame_index == MESH_FRAME_INDEX
 
 
 @dataclass

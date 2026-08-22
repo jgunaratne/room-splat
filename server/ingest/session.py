@@ -50,6 +50,9 @@ class LiveSession:
         self.live_seq: int = 0
         self.point_cloud_version = 0
         self.point_cloud: tuple[np.ndarray, np.ndarray] | None = None
+        # ARKit scene-reconstruction room mesh for the LiDAR tab (opaque bytes).
+        self.room_mesh: bytes | None = None
+        self.room_mesh_version = 0
         # frame_index -> pose, populated by keyframe_meta and consumed by the image
         self._pending_meta: dict[int, KeyframeMeta] = {}
         self._written: set[int] = set()
@@ -105,6 +108,12 @@ class LiveSession:
         self._highest_ack = max(self._highest_ack, frame_index)
         self.package.update_capture(frame_count=self.stats.frame_count)
         return file_path
+
+    def on_room_mesh(self, mesh: bytes) -> int:
+        """Store the latest LiDAR room mesh (served for the viewer's LiDAR tab)."""
+        self.room_mesh = mesh
+        self.room_mesh_version += 1
+        return self.room_mesh_version
 
     def on_preview(self, jpeg: bytes) -> int:
         """A low-res preview frame: update the PiP image only (no disk, no training)."""
