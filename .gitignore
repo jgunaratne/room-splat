@@ -14,3 +14,5 @@ vendor/
 # os
 .DS_Store
 .jtui/
+
+server/uvicorn.log
