@@ -12,7 +12,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from ingest.session import LiveSession
@@ -75,6 +75,16 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
         finally:
             mgr.remove_viewer(ws)
 
+    @app.get("/live/{session_id}.jpg")
+    async def live_frame(session_id: str):
+        # Latest keyframe JPEG for the picture-in-picture panel. Kept in memory and
+        # marked no-store since it changes every frame (cache-bust via ?t=frame_index).
+        rt = app.state.manager.sessions.get(session_id)
+        jpeg = rt.session.latest_jpeg if rt else None
+        if not jpeg:
+            return Response(status_code=404)
+        return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
     # /assets serves versioned, immutable cell + cloud URLs referenced by manifests.
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
@@ -127,6 +137,13 @@ async def _handle_binary(mgr: SessionManager, ws: WebSocket, current: str | None
     else:
         if rt.session.on_image(frame_index, payload) is not None:
             rt.on_image()
+            # Notify viewers there's a fresh frame to show in the PiP panel; the image
+            # itself is fetched over HTTP from /live/<id>.jpg (WS carries only notice).
+            await mgr.broadcast({
+                "type": "live_frame",
+                "session_id": rt.session.session_id,
+                "frame_index": frame_index,
+            })
         # Ack every image that is now durably on disk. The client advances its resume
         # point to this index; capture is never blocked on the ack (SPEC.md §4).
         await ws.send_text(json.dumps({"type": ControlType.ACK, "frame_index": frame_index}))

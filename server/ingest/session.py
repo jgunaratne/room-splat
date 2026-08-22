@@ -41,6 +41,10 @@ class LiveSession:
         self.package = RoomSplatPackage.create(self.root, capture_meta, camera)
         self.stats = SessionStats()
         self.latest_pose: list[list[float]] | None = None
+        # Most recent keyframe JPEG, kept in memory so the viewer can show a live
+        # picture-in-picture of what the phone is scanning right now.
+        self.latest_jpeg: bytes | None = None
+        self.latest_frame_index: int = -1
         self.point_cloud_version = 0
         self.point_cloud: tuple[np.ndarray, np.ndarray] | None = None
         # frame_index -> pose, populated by keyframe_meta and consumed by the image
@@ -88,6 +92,8 @@ class LiveSession:
             self.package.update_capture(frames_dropped=self.stats.frames_dropped)
             return None
         file_path = self.package.append_keyframe(frame_index, jpeg, meta.transform_matrix)
+        self.latest_jpeg = jpeg
+        self.latest_frame_index = frame_index
         self._written.add(frame_index)
         self.stats.frame_count += 1
         self._highest_ack = max(self._highest_ack, frame_index)

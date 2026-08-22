@@ -51,6 +51,20 @@ setMode("follow");
 
 let followTarget = null;
 
+// Picture-in-picture of the phone's latest keyframe (top-right). The WS only notifies;
+// the JPEG is fetched over HTTP, cache-busted by frame_index (server sends no-store).
+const pipEl = document.getElementById("pip");
+const pipImg = document.getElementById("pipImg");
+const pipFrame = document.getElementById("pipFrame");
+function showPip(sessionId, frameIndex) {
+  pipImg.src = `/live/${sessionId}.jpg?t=${frameIndex}`;
+  pipFrame.textContent = `#${frameIndex}`;
+  pipEl.style.display = "block";
+}
+function hidePip() {
+  pipEl.style.display = "none";
+}
+
 function onManifest(msg) {
   if (msg.point_cloud_url) cloud.update(msg.point_cloud_url);
   if (msg.cells?.length) {
@@ -87,9 +101,12 @@ function connect() {
     else if (msg.type === "live_pose") {
       const t = frustum.update(msg.pose);
       if (t) followTarget = t;
+    } else if (msg.type === "live_frame") {
+      showPip(msg.session_id, msg.frame_index);
     } else if (msg.type === "session_complete") {
       statusEl.textContent = "session complete";
       setMode("free");
+      hidePip();
     }
   };
 }
