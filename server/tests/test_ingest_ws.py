@@ -93,3 +93,70 @@ def test_ingest_records_camera_locks_and_tracking_warnings(tmp_path):
     assert pkg.capture["exposure_locked"] is True
     assert pkg.capture["white_balance_locked"] is True
     assert "Exposure lock lost during capture" in pkg.capture.get("tracking_warnings", [])
+
+
+def test_ingest_reconnect_resumes_from_highest_ack(tmp_path):
+    """Test dropping the connection mid-session and reconnecting with same session_id."""
+    manager = SessionManager(tmp_path / "captures", tmp_path / "assets", backend_name="synthetic")
+    app = create_app(manager)
+    client = TestClient(app)
+    from tests.conftest import _tiny_jpeg
+
+    # First connection: send keyframes 0 and 1
+    with client.websocket_connect("/ws/ingest") as ingest:
+        ingest.send_text(json.dumps({
+            "type": "session_open",
+            "session_id": "resume-uuid",
+            "device_model": "iPhone17,2",
+            "captured_at": "2026-08-22T10:14:00Z",
+            "camera": {"camera_model": "OPENCV", "fl_x": 1400, "fl_y": 1400,
+                       "cx": 800, "cy": 600, "w": 1600, "h": 1200},
+        }))
+        ack0 = json.loads(ingest.receive_text())
+        assert ack0["type"] == "ack"
+        assert ack0["frame_index"] == -1
+
+        ingest.send_bytes(encode_binary(POINT_CLOUD_FRAME_INDEX, _cloud_bytes(tmp_path)))
+
+        for i in range(2):
+            pose = np.eye(4)
+            ingest.send_text(json.dumps({
+                "type": "keyframe_meta", "frame_index": i,
+                "transform_matrix": pose.tolist(), "timestamp": float(i),
+            }))
+            ingest.send_bytes(encode_binary(i, _tiny_jpeg()))
+            ack = json.loads(ingest.receive_text())
+            assert ack["type"] == "ack"
+            assert ack["frame_index"] == i
+        # Simulate connection drop (exit context manager)
+
+    # Reconnect with the same session_id
+    with client.websocket_connect("/ws/ingest") as ingest:
+        ingest.send_text(json.dumps({
+            "type": "session_open",
+            "session_id": "resume-uuid",
+            "device_model": "iPhone17,2",
+            "captured_at": "2026-08-22T10:14:00Z",
+            "camera": {"camera_model": "OPENCV", "fl_x": 1400, "fl_y": 1400,
+                       "cx": 800, "cy": 600, "w": 1600, "h": 1200},
+        }))
+        ack_resume = json.loads(ingest.receive_text())
+        assert ack_resume["type"] == "ack"
+        assert ack_resume["frame_index"] == 1  # Resumes from highest acked frame (1)
+
+        # Send frame 2 and complete session
+        pose = np.eye(4)
+        ingest.send_text(json.dumps({
+            "type": "keyframe_meta", "frame_index": 2,
+            "transform_matrix": pose.tolist(), "timestamp": 2.0,
+        }))
+        ingest.send_bytes(encode_binary(2, _tiny_jpeg()))
+        ack2 = json.loads(ingest.receive_text())
+        assert ack2["frame_index"] == 2
+
+        ingest.send_text(json.dumps({"type": "session_complete", "session_id": "resume-uuid"}))
+
+    pkg = RoomSplatPackage.open(tmp_path / "captures" / "resume-uuid.roomsplat")
+    pkg.validate()
+    assert len(pkg.frames) == 3
+    assert pkg.capture["frame_count"] == 3
