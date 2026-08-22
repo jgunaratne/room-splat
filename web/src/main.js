@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 import { PointCloudLayer } from "./pointcloud.js";
 import { CellManager } from "./cells.js";
 import { LiveFrustum } from "./frustum.js";
@@ -23,51 +24,74 @@ document.body.appendChild(renderer.domElement);
 renderer.domElement.tabIndex = 0;
 renderer.domElement.style.outline = "none";
 renderer.domElement.focus();
-renderer.domElement.addEventListener("pointerdown", () => renderer.domElement.focus());
 
+// Orbit is the secondary "inspect" mode; fly (pointer-lock FPS) is the default free-look.
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+controls.enabled = false;
 const clock = new THREE.Clock();
 
-// WASD fly navigation (works in free mode): W/S forward-back along the view direction,
-// A/D strafe, Q/E (or Space/Ctrl) down/up, Shift to move faster. Movement translates the
-// camera AND the orbit target together, so mouse-drag still looks around as you fly.
+// Fly navigation: game-style pointer-lock mouselook + WASD (SPEC.md §4 free viewing).
+// Click the canvas to capture the mouse and look; Esc releases. WASD walks on the
+// horizontal plane relative to where you're facing (looking down never dives), Space/E
+// up and Ctrl/Q down, Shift to sprint, mouse wheel to change speed.
+const fly = new PointerLockControls(camera, renderer.domElement);
+fly.pointerSpeed = 0.8;                 // mouse sensitivity
+
 const keys = new Set();
-const MOVE_SPEED = 2.5;   // metres/second
-const BOOST = 4;          // Shift multiplier
-const MOVE_KEYS = new Set(["w", "a", "s", "d", "q", "e", " "]);
+const MIN_SPEED = 0.3, MAX_SPEED = 40;  // metres/second (wheel-adjustable)
+let moveSpeed = 2.5;
+const BOOST = 4;                         // Shift multiplier
+const ACCEL = 12;                        // velocity ramp (1/s) for precise taps, fast holds
+const velocity = new THREE.Vector3();
+const MOVE_KEYS = new Set(["w", "a", "s", "d", "q", "e", " ", "control"]);
+
 addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
-  if (MOVE_KEYS.has(k)) {
-    keys.add(k);
-    if (mode === "follow") setMode("free"); // take control, like a drag
-    if (k === " ") e.preventDefault();      // don't scroll the page
-  }
+  if (k === "shift") { keys.add("shift"); return; }
+  if (!MOVE_KEYS.has(k)) return;
+  keys.add(k);
+  if (mode === "follow") setMode("fly");   // take control, like a drag
+  if (k === " " || k === "control") e.preventDefault(); // don't scroll / trigger shortcuts
 });
 addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
-addEventListener("blur", () => keys.clear());
+addEventListener("blur", () => { keys.clear(); velocity.set(0, 0, 0); });
+
+// Wheel adjusts fly speed (orbit keeps the wheel for zoom).
+renderer.domElement.addEventListener("wheel", (e) => {
+  if (mode !== "fly") return;
+  e.preventDefault();
+  moveSpeed = THREE.MathUtils.clamp(moveSpeed * (e.deltaY < 0 ? 1.15 : 1 / 1.15),
+                                    MIN_SPEED, MAX_SPEED);
+  refreshModeLabel();
+}, { passive: false });
 
 function applyFlyMovement(dt) {
-  if (keys.size === 0) return;
+  if (mode === "follow") { velocity.set(0, 0, 0); return; }
+  // Horizontal forward/right from yaw only, so pitch never tilts movement.
   const forward = new THREE.Vector3();
   camera.getWorldDirection(forward);
-  const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
-  const move = new THREE.Vector3();
-  if (keys.has("w")) move.add(forward);
-  if (keys.has("s")) move.sub(forward);
-  if (keys.has("d")) move.add(right);
-  if (keys.has("a")) move.sub(right);
-  if (keys.has("e") || keys.has(" ")) move.y += 1;
-  if (keys.has("q")) move.y -= 1;
-  if (move.lengthSq() === 0) return;
-  const speed = MOVE_SPEED * (keys.has("shift") ? BOOST : 1) * dt;
-  move.normalize().multiplyScalar(speed);
-  camera.position.add(move);
-  controls.target.add(move);
+  forward.y = 0;
+  if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1); // looking straight up/down
+  forward.normalize();
+  const right = new THREE.Vector3(-forward.z, 0, forward.x); // cross(forward, up): screen-right
+  const wish = new THREE.Vector3();
+  if (keys.has("w")) wish.add(forward);
+  if (keys.has("s")) wish.sub(forward);
+  if (keys.has("d")) wish.add(right);
+  if (keys.has("a")) wish.sub(right);
+  if (keys.has("e") || keys.has(" ")) wish.y += 1;
+  if (keys.has("q") || keys.has("control")) wish.y -= 1;
+  const target = wish.lengthSq() > 0
+    ? wish.normalize().multiplyScalar(moveSpeed * (keys.has("shift") ? BOOST : 1))
+    : wish.set(0, 0, 0);
+  // Ease current velocity toward the target for a crisp-but-not-jerky ramp.
+  velocity.lerp(target, 1 - Math.exp(-ACCEL * dt));
+  if (velocity.lengthSq() < 1e-8) return;
+  const delta = velocity.clone().multiplyScalar(dt);
+  camera.position.add(delta);
+  if (mode === "orbit") controls.target.add(delta); // keep orbit pivot ahead of the camera
 }
-// Shift tracked separately (it isn't a movement key on its own).
-addEventListener("keydown", (e) => { if (e.key === "Shift") keys.add("shift"); });
-addEventListener("keyup", (e) => { if (e.key === "Shift") keys.delete("shift"); });
 
 // Lights for the LiDAR room mesh (splats/points are unlit and ignore these).
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.1));
@@ -109,13 +133,15 @@ function setTab(t) {
 tabSplat.onclick = () => setTab("splat");
 tabLidar.onclick = () => setTab("lidar");
 
-// Two camera modes (SPEC.md §4): follow tracks the live ARKit pose while a session is
-// open; free is a standard orbit. Switch to free on session_complete.
+// Camera modes (SPEC.md §4): follow tracks the live ARKit pose while a session is open;
+// fly is game-style pointer-lock free-look (the default free mode); orbit is the
+// secondary inspect mode. The button cycles follow → fly → orbit.
 let mode = "follow";
 const statusEl = document.getElementById("status");
 const countsEl = document.getElementById("counts");
 const modeBtn = document.getElementById("mode");
-modeBtn.onclick = () => setMode(mode === "follow" ? "free" : "follow");
+const NEXT_MODE = { follow: "fly", fly: "orbit", orbit: "follow" };
+modeBtn.onclick = () => setMode(NEXT_MODE[mode]);
 
 const coverageBtn = document.getElementById("coverage");
 let coverageOn = true;
@@ -148,20 +174,37 @@ function clearScene() {
   countsEl.textContent = "";
   logLine("scene reset — ready for a new capture", "ok");
 }
+function refreshModeLabel() {
+  modeBtn.textContent = mode === "fly"
+    ? `camera: fly · ${moveSpeed.toFixed(1)} m/s`
+    : `camera: ${mode}`;
+}
 function setMode(m) {
   mode = m;
-  controls.enabled = m === "free";
-  modeBtn.textContent = `camera: ${m}`;
+  controls.enabled = m === "orbit";
+  if (m === "orbit") {
+    // Put the orbit pivot a few metres ahead of the camera so it rotates about what
+    // you were looking at, not a stale target left over from the last orbit session.
+    const ahead = camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(3);
+    controls.target.copy(camera.position).add(ahead);
+    controls.update();
+  }
+  if (m !== "fly" && fly.isLocked) fly.unlock();
+  refreshModeLabel();
 }
 setMode("follow");
 
-// Follow mode locks the camera onto the operator, so orbit is disabled while a session
-// streams. Let any interaction take control immediately (switch to free) so the scene
-// is inspectable during generation; the button toggles back to follow.
-for (const evName of ["pointerdown", "wheel", "touchstart"]) {
+// Follow mode locks the camera onto the operator. Any interaction takes control (→ fly)
+// so the scene is inspectable during generation; the button cycles modes.
+renderer.domElement.addEventListener("pointerdown", () => {
+  renderer.domElement.focus();
+  if (mode === "follow") setMode("fly");
+  if (mode === "fly" && !fly.isLocked) fly.lock(); // capture the mouse for free-look
+});
+for (const evName of ["wheel", "touchstart"]) {
   renderer.domElement.addEventListener(
     evName,
-    () => { if (mode === "follow") setMode("free"); },
+    () => { if (mode === "follow") setMode("fly"); },
     { passive: true },
   );
 }
@@ -272,8 +315,8 @@ function connect() {
       showPip(msg.session_id, msg.frame_index);
     } else if (msg.type === "session_complete") {
       statusEl.textContent = "session complete";
-      logLine("session complete — camera unlocked", "ok");
-      setMode("free");
+      logLine("session complete — camera unlocked (click to look, WASD to move)", "ok");
+      setMode("fly");
       hidePip();
     }
   };
@@ -289,17 +332,15 @@ addEventListener("resize", () => {
 
 function animate() {
   requestAnimationFrame(animate);
-  const dt = clock.getDelta();
-  const flying = keys.size > 0;
-  // Apply WASD first, always, so it works regardless of mode/session state.
+  const dt = Math.min(clock.getDelta(), 0.1); // clamp so a stalled tab doesn't teleport
   applyFlyMovement(dt);
-  if (mode === "follow" && followTarget && !flying) {
+  if (mode === "follow" && followTarget) {
     // Ease the browser camera toward the operator so the screen shows what's scanned.
     const desired = followTarget.clone().add(new THREE.Vector3(0, 1.5, 3));
     camera.position.lerp(desired, 0.05);
     camera.lookAt(followTarget);
-  } else {
-    controls.update();
+  } else if (mode === "orbit") {
+    controls.update(); // damping; fly updates the camera directly via pointer lock + WASD
   }
   renderer.render(scene, camera);
 }
