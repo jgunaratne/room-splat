@@ -133,6 +133,10 @@ class SessionManager:
         capture.setdefault("device_model", msg.get("device_model", "unknown"))
         capture.setdefault("captured_at", msg.get("captured_at", ""))
         capture.setdefault("source", "stream")
+        # The mirror starts empty; counters are recomputed as frames arrive. Never
+        # carry over a stale frame_count from a copied capture (e.g. during --replay).
+        capture["frame_count"] = 0
+        capture["frames_dropped"] = 0
         root = self.data_dir / f"{session_id}.roomsplat"
         session = LiveSession(session_id, root, capture, camera)
         rt = SessionRuntime(self, session, self.backend_name)

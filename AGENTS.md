@@ -32,8 +32,11 @@ when its gate test passes, not when the code looks right. Commit at every gate, 
    (`train/backends.py`) keeps the ingest/chunk/export/manifest/viewer pipeline runnable
    and tested without CUDA; it is a test/CI aid, never a deliverable. The gsplat GPU
    loop and coordinate conversion are validated by `tests/test_gsplat_gpu.py`
-   (auto-skips without CUDA). The remaining M2 work is the metric-scale/orientation
-   check against a real room capture (a door ~2.0 m within 5%).
+   (auto-skips without CUDA). The trainer loads keyframes incrementally by re-reading
+   the disk mirror each tick (`refresh()`), so live streaming trains with gsplat without
+   restarting (§4), using 70/30 recent/uniform view sampling. The remaining M2 work is
+   the metric-scale/orientation check against a real room capture (a door ~2.0 m within
+   5%). Set `ROOMSPLAT_BACKEND=gsplat` to use it live/offline.
 
 4. **Cell asset format: PLY now, SPZ on the GPU box.** SPEC.md §4/M6 specify per-cell
    SPZ. The GPU-free export path writes 3DGS PLY (Spark loads both) and the manifest's
