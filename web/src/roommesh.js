@@ -14,9 +14,11 @@ export class RoomMesh {
     this.version = -1;
     this._url = null;
     this.visible = false;
-    this.material = new THREE.MeshStandardMaterial({
-      color: 0x9aa4b2, roughness: 0.95, metalness: 0.0,
-      flatShading: false, side: THREE.DoubleSide,
+    // Wireframe, to mirror the phone's ARKit scene-reconstruction triangle overlay. As
+    // more anchors stream in, each update replaces the mesh with the fuller triangle set,
+    // so the wireframe visibly fills out (matching what the operator sees on-device).
+    this.material = new THREE.MeshBasicMaterial({
+      color: 0x6fd3ff, wireframe: true, transparent: true, opacity: 0.6,
     });
   }
 

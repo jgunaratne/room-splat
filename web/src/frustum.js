@@ -51,11 +51,15 @@ export class LiveFrustum {
     );
     this.frustum.quaternion.setFromRotationMatrix(rot);
 
-    this.trailPositions.push(t.x, t.y, t.z);
-    this.trail.geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(new Float32Array(this.trailPositions), 3),
-    );
+    // Append to the trail only when the camera actually moved, so the low-latency
+    // live_pose stream and the periodic manifest snapshot (which carry the same latest
+    // pose) don't double-add coincident points.
+    const p = this.trailPositions;
+    const n = p.length;
+    if (n < 3 || Math.hypot(t.x - p[n - 3], t.y - p[n - 2], t.z - p[n - 1]) > 0.01) {
+      p.push(t.x, t.y, t.z);
+      this.trail.geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(p), 3));
+    }
     return t;
   }
 }
