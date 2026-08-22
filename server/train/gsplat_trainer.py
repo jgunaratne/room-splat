@@ -37,18 +37,26 @@ class GsplatTrainer:
         self.device = torch.device(device)
         self.sh_degree = sh_degree
         self.max_image_long_edge = max_image_long_edge
+        self.package_root = Path(package_root)
+        # Do not validate() here: during live streaming the package is mid-write (frames
+        # still arriving). The offline driver validates before constructing the backend.
         self.pkg = RoomSplatPackage.open(package_root)
-        self.pkg.validate()
         self._iters = 0
-        self._load_cameras()
-        self._init_gaussians()
+        self._init_camera_intrinsics()
+        self._init_gaussians()               # scene_scale from the seed cloud extent
         self._init_optimizers_and_strategy()
+        # Views are loaded incrementally so live streaming can keep adding keyframes
+        # (SPEC.md §4: never restart training on arrival). refresh() picks up any new
+        # frames the disk mirror has appended to the package.
+        self.viewmats = torch.empty(0, 4, 4, device=self.device)
+        self.images = torch.empty(0, self.H, self.W, 3, device=self.device)
+        self._n_loaded = 0
+        self.refresh()
 
     # ---- data ---------------------------------------------------------------
 
-    def _load_cameras(self) -> None:
+    def _init_camera_intrinsics(self) -> None:
         cam = self.pkg.camera
-        frames = self.pkg.frames
         # Scale intrinsics if we downscale images to the long-edge cap.
         scale = min(1.0, self.max_image_long_edge / max(cam.w, cam.h))
         self.W = int(round(cam.w * scale))
@@ -57,26 +65,42 @@ class GsplatTrainer:
         K[:2] *= scale
         self.K = K.to(self.device)
 
+    def refresh(self) -> int:
+        """Load any keyframes appended to the package since the last call.
+
+        Re-opens the package (the disk mirror rewrites transforms.json atomically after
+        every append, §6) and appends new views. Returns the number newly loaded.
+        """
+        pkg = RoomSplatPackage.open(self.package_root)
+        frames = pkg.frames
+        new = frames[self._n_loaded:]
+        if not new:
+            return 0
         viewmats, images = [], []
-        for fr in frames:
+        for fr in new:
             w2c = opengl_c2w_to_opencv_w2c(np.asarray(fr.transform_matrix))
             viewmats.append(torch.from_numpy(w2c.astype(np.float32)))
-            img = Image.open(self.pkg.root / fr.file_path).convert("RGB")
+            img = Image.open(self.package_root / fr.file_path).convert("RGB")
             if img.size != (self.W, self.H):
                 img = img.resize((self.W, self.H), Image.BILINEAR)
             images.append(torch.from_numpy(np.asarray(img, dtype=np.float32) / 255.0))
-        self.viewmats = torch.stack(viewmats).to(self.device)  # (C,4,4) world->cam
-        self.images = torch.stack(images).to(self.device)      # (C,H,W,3)
-        self.cam_positions = torch.stack([torch.tensor(f.transform_matrix)[3, :3] for f in frames])
-        centroid = self.cam_positions.mean(0)
-        self.scene_scale = float((self.cam_positions - centroid).norm(dim=1).max().clamp(min=1e-3))
-        log.info("loaded %d cameras %dx%d, scene_scale=%.2f", len(frames), self.W, self.H, self.scene_scale)
+        vm = torch.stack(viewmats).to(self.device)
+        im = torch.stack(images).to(self.device)
+        self.viewmats = torch.cat([self.viewmats, vm], dim=0)
+        self.images = torch.cat([self.images, im], dim=0)
+        self._n_loaded = len(frames)
+        log.info("loaded %d new keyframes (%d total)", len(new), self._n_loaded)
+        return len(new)
 
     def _init_gaussians(self) -> None:
         xyz, rgb = self.pkg.read_point_cloud()
         means = torch.from_numpy(xyz.astype(np.float32))
         rgb01 = torch.from_numpy(rgb.astype(np.float32) / 255.0)
         n = len(means)
+        # scene_scale from the seed cloud extent: frame-independent, so learning rates
+        # are stable whether frames are all present (offline) or trickling in (live).
+        extent = (means.max(0).values - means.min(0).values).norm()
+        self.scene_scale = float((0.5 * extent).clamp(min=1e-3))
         # Init scale from local spacing so densification starts from a sane size.
         dist = self._mean_neighbor_dist(means).clamp(min=1e-4)
         scales = torch.log(dist)[:, None].repeat(1, 3)
@@ -146,12 +170,22 @@ class GsplatTrainer:
         )
         return renders, alphas, info
 
+    def _sample_cam(self, rng: np.random.Generator, n: int) -> int:
+        # 70% from the most recent 20 keyframes, 30% uniform (SPEC.md §4): puts gradient
+        # where the new data is without letting earlier regions degrade.
+        if n <= 20 or rng.random() < 0.3:
+            return int(rng.integers(0, n))
+        return int(rng.integers(n - 20, n))
+
     def step(self, n_iters: int) -> None:
-        rng = np.random.default_rng()
+        self.refresh()  # pick up keyframes streamed since the last tick
         n_cams = len(self.viewmats)
+        if n_cams == 0:
+            return  # nothing to train against yet (live: waiting on first keyframe)
+        rng = np.random.default_rng()
         for _ in range(n_iters):
             step = self._iters
-            cam_id = int(rng.integers(0, n_cams))
+            cam_id = self._sample_cam(rng, n_cams)
             cam_ids = torch.tensor([cam_id], device=self.device)
             renders, _alphas, info = self._rasterize(cam_ids)
             self.strategy.step_pre_backward(self.params, self.optimizers, self.strategy_state, step, info)
