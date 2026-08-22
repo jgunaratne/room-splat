@@ -7,6 +7,19 @@ import * as THREE from "three";
 //   [vertexCount x float32 x,y,z][vertexCount x float32 nx,ny,nz][indexCount x uint32]
 // little-endian. Falls back to the fused point cloud when no mesh is available yet.
 
+// Unpack `count` little-endian float3 vectors at byteOffset with the given byte stride
+// into a tightly-packed Float32Array (fast path when already tight).
+function readVec3(view, off, count, stride) {
+  const out = new Float32Array(count * 3);
+  for (let k = 0; k < count; k++) {
+    const b = off + k * stride;
+    out[k * 3] = view.getFloat32(b, true);
+    out[k * 3 + 1] = view.getFloat32(b + 4, true);
+    out[k * 3 + 2] = view.getFloat32(b + 8, true);
+  }
+  return out;
+}
+
 export class RoomMesh {
   constructor(scene) {
     this.scene = scene;
@@ -35,14 +48,18 @@ export class RoomMesh {
     const view = new DataView(buf);
     const vCount = view.getUint32(0, true);
     const iCount = view.getUint32(4, true);
+    // The vertex stride is 12 bytes (tight xyz) or 16 (Swift SIMD3<Float> padding) —
+    // detect it from the total length so either encoder build renders. Normals aren't
+    // needed for the unlit wireframe, so we only unpack positions and indices.
+    const tight = 8 + vCount * 12 * 2 + iCount * 4;
+    const stride = buf.byteLength === tight ? 12 : 16;
     let o = 8;
-    const positions = new Float32Array(buf, o, vCount * 3); o += vCount * 3 * 4;
-    const normals = new Float32Array(buf, o, vCount * 3); o += vCount * 3 * 4;
-    const indices = new Uint32Array(buf, o, iCount);
+    const positions = readVec3(view, o, vCount, stride); o += vCount * stride;
+    o += vCount * stride; // skip normals
+    const indices = new Uint32Array(buf.slice(o, o + iCount * 4));
     const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.BufferAttribute(positions.slice(), 3));
-    geom.setAttribute("normal", new THREE.BufferAttribute(normals.slice(), 3));
-    geom.setIndex(new THREE.BufferAttribute(indices.slice(), 1));
+    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geom.setIndex(new THREE.BufferAttribute(indices, 1));
     const next = new THREE.Mesh(geom, this.material);
     next.visible = this.visible;
     if (this.mesh) {

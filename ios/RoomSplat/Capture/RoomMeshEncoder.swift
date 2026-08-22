@@ -68,8 +68,21 @@ enum RoomMeshEncoder {
         var iCount = UInt32(indices.count).littleEndian
         withUnsafeBytes(of: &vCount) { data.append(contentsOf: $0) }
         withUnsafeBytes(of: &iCount) { data.append(contentsOf: $0) }
-        for p in positions { var v = p; withUnsafeBytes(of: &v) { data.append(contentsOf: $0) } }
-        for n in normals { var v = n; withUnsafeBytes(of: &v) { data.append(contentsOf: $0) } }
+        // Write x,y,z as three separate floats: SIMD3<Float> is 16-byte padded, so
+        // dumping its raw bytes would emit 4 stray bytes per vertex and misalign the
+        // reader (the room.bin format is tightly packed, 12 bytes/vertex).
+        for p in positions {
+            var x = p.x, y = p.y, z = p.z
+            withUnsafeBytes(of: &x) { data.append(contentsOf: $0) }
+            withUnsafeBytes(of: &y) { data.append(contentsOf: $0) }
+            withUnsafeBytes(of: &z) { data.append(contentsOf: $0) }
+        }
+        for n in normals {
+            var x = n.x, y = n.y, z = n.z
+            withUnsafeBytes(of: &x) { data.append(contentsOf: $0) }
+            withUnsafeBytes(of: &y) { data.append(contentsOf: $0) }
+            withUnsafeBytes(of: &z) { data.append(contentsOf: $0) }
+        }
         for i in indices { var v = i.littleEndian; withUnsafeBytes(of: &v) { data.append(contentsOf: $0) } }
         return data
     }
