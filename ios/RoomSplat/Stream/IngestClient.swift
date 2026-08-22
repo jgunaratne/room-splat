@@ -51,7 +51,9 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     func connect() {
-        let task = session.webSocketTask(with: serverURL.appendingPathComponent("ws/ingest"))
+        let url = serverURL.appendingPathComponent("ws/ingest")
+        print("[ingest] connecting to \(url.absoluteString)")
+        let task = session.webSocketTask(with: url)
         self.task = task
         task.resume()
         receiveLoop()
@@ -65,7 +67,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
         guard let data = try? JSONSerialization.data(withJSONObject: obj),
               let text = String(data: data, encoding: .utf8) else { return }
         task?.send(.string(text)) { [weak self] error in
-            if let error { print("ingest control send failed:", error) }
+            if let error { print("[ingest] control send failed:", error) }
             self?.onTransmit?(error == nil)
         }
     }
@@ -98,7 +100,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
         var frame = Data(bytes: &header, count: 4)
         frame.append(payload)
         task?.send(.data(frame)) { [weak self] error in
-            if let error { print("ingest binary send failed:", error) }
+            if let error { print("[ingest] binary send failed:", error) }
             self?.onTransmit?(error == nil)
         }
     }
@@ -122,7 +124,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
             case .success:
                 self.receiveLoop()
             case .failure(let error):
-                print("ingest receive failed, reconnecting:", error)
+                print("[ingest] receive failed, reconnecting:", error)
                 self.stopKeepalive()
                 self.onError?(error.localizedDescription)
                 self.onConnectionChange?(false)
@@ -151,6 +153,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
                     didOpenWithProtocol protocol: String?) {
+        print("[ingest] connected (handshake open)")
         startKeepalive()
         onConnectionChange?(true)
     }
@@ -158,7 +161,9 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
                     didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
         stopKeepalive()
-        if let reason, let text = String(data: reason, encoding: .utf8), !text.isEmpty {
+        let text = reason.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        print("[ingest] closed code=\(closeCode.rawValue) reason=\(text.isEmpty ? "<none>" : text)")
+        if !text.isEmpty {
             onError?("closed (\(closeCode.rawValue)): \(text)")
         } else {
             onError?("closed (code \(closeCode.rawValue))")
@@ -170,6 +175,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     /// (e.g. Cloudflare returns 403/1006 or a TLS error), which `didClose` won't report.
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
+            print("[ingest] task failed: \(error.localizedDescription) — \(error)")
             onError?(error.localizedDescription)
             onConnectionChange?(false)
         }
@@ -183,7 +189,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
         timer.schedule(deadline: .now() + Self.keepaliveInterval, repeating: Self.keepaliveInterval)
         timer.setEventHandler { [weak self] in
             self?.task?.sendPing { error in
-                if let error { print("ingest ping failed:", error) }
+                if let error { print("[ingest] ping failed:", error) }
             }
         }
         timer.resume()

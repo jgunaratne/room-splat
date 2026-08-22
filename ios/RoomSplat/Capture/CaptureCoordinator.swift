@@ -91,6 +91,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         guard let arSession, let url = URL(string: urlString) else {
             setStatus("Bad server host"); return
         }
+        print("[capture] starting; server host=\(host) -> \(url.absoluteString)")
 
         queue.async {
             self.selector = KeyframeSelector()
