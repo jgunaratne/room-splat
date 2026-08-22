@@ -10,5 +10,8 @@ export default defineConfig({
       "/assets": "http://localhost:8000",
     },
   },
-  build: { outDir: "dist" },
+  // Emit the app bundle under /static/, NOT /assets/: the server mounts /assets for
+  // versioned cell + point-cloud data (manifest URLs), which would otherwise shadow the
+  // bundle and 404 the whole viewer in a browser.
+  build: { outDir: "dist", assetsDir: "static" },
 });
