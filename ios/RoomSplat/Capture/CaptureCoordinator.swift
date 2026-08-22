@@ -6,6 +6,7 @@
 // hopped to the main queue.
 
 import ARKit
+import AVFoundation
 import CoreImage
 import UIKit
 import simd
@@ -70,6 +71,14 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private let governor = ThermalGovernor()
     private let fuser = PointCloudFuser()
     private let ciContext = CIContext(options: nil)
+
+    // Camera locks (SPEC.md §3): lock exposure + white balance, fixed focus pre-session.
+    // Assert every frame; record a warning in session metadata if any lock is lost.
+    private var captureDevice: AVCaptureDevice?
+    private(set) var exposureLocked = false
+    private(set) var whiteBalanceLocked = false
+    private(set) var focusLocked = false
+    private var trackingWarnings: [String] = []
 
     private var frameIndex = 0
     private var lastCloudKeyframe = 0
@@ -138,6 +147,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         config.frameSemantics = .sceneDepth
         config.worldAlignment = .gravity
         arSession.run(config, options: [.resetTracking, .removeExistingAnchors])
+        applyCameraLocks()
         governor.start()
 
         publish {
@@ -151,6 +161,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
 
     func stop() {
         arSession?.pause()
+        unlockCamera()
         governor.stop()
         queue.async {
             self.ingest?.send(control: .sessionComplete, payload: [:])
@@ -211,6 +222,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
             "session_id": UUID().uuidString,
             "device_model": UIDevice.current.model,
             "captured_at": formatter.string(from: Date()),
+            "exposure_locked": exposureLocked,
+            "white_balance_locked": whiteBalanceLocked,
+            "tracking_warnings": trackingWarnings,
             "camera": [
                 "camera_model": "OPENCV",
                 "fl_x": Double(intr.columns.0.x),
@@ -254,6 +268,104 @@ final class CaptureCoordinator: NSObject, ObservableObject {
 
     private func setStatus(_ text: String) { publish { self.status = text } }
 
+    // MARK: - camera configuration & lock assertion (SPEC.md §3)
+
+    /// Configure and lock exposure, white balance, and focus before capture begins.
+    /// Auto-exposure drift while panning past a window causes blotchy splats; autofocus
+    /// alters intrinsics mid-capture.
+    private func applyCameraLocks() {
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            print("[capture] no back wide-angle camera available for locking")
+            return
+        }
+        captureDevice = device
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+
+            // 1. Exposure: lock to current exposure settings
+            if device.isExposureModeSupported(.locked) {
+                device.exposureMode = .locked
+                exposureLocked = true
+                print("[capture] exposure locked")
+            } else {
+                exposureLocked = false
+                recordWarning("Exposure lock not supported on device")
+            }
+
+            // 2. White balance: lock to current gains
+            if device.isWhiteBalanceModeSupported(.locked) {
+                device.whiteBalanceMode = .locked
+                whiteBalanceLocked = true
+                print("[capture] white balance locked")
+            } else {
+                whiteBalanceLocked = false
+                recordWarning("White balance lock not supported on device")
+            }
+
+            // 3. Focus: lock to current lens position (fixed focus)
+            if device.isFocusModeSupported(.locked) {
+                device.focusMode = .locked
+                focusLocked = true
+                print("[capture] focus locked")
+            } else {
+                focusLocked = false
+                recordWarning("Focus lock not supported on device")
+            }
+        } catch {
+            print("[capture] failed to lock camera configuration: \(error)")
+            recordWarning("Camera lock configuration failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Restore continuous auto modes on capture device when session stops.
+    private func unlockCamera() {
+        guard let device = captureDevice else { return }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+        } catch {
+            print("[capture] failed to unlock camera: \(error)")
+        }
+        exposureLocked = false
+        whiteBalanceLocked = false
+        focusLocked = false
+        captureDevice = nil
+    }
+
+    /// Assert every frame that camera locks remain intact. Record a tracking warning if lost.
+    private func assertCameraLocks() {
+        guard let device = captureDevice else { return }
+        if exposureLocked && device.exposureMode != .locked {
+            exposureLocked = false
+            recordWarning("Exposure lock lost during capture")
+        }
+        if whiteBalanceLocked && device.whiteBalanceMode != .locked {
+            whiteBalanceLocked = false
+            recordWarning("White balance lock lost during capture")
+        }
+        if focusLocked && device.focusMode != .locked {
+            focusLocked = false
+            recordWarning("Focus lock lost during capture")
+        }
+    }
+
+    /// Record a warning in session metadata and forward to server via WebSocket if connected.
+    private func recordWarning(_ message: String) {
+        print("[capture warning] \(message)")
+        trackingWarnings.append(message)
+        ingest?.send(control: .trackingWarning, payload: ["message": message])
+    }
+
     private func publish(_ work: @escaping () -> Void) {
         DispatchQueue.main.async(execute: work)
     }
@@ -261,6 +373,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
 
 extension CaptureCoordinator: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // Assert camera locks every frame (SPEC.md §3): exposure, WB, fixed focus
+        assertCameraLocks()
+
         guard let ingest else { return }
 
         if !sessionOpened {

@@ -140,6 +140,10 @@ class SessionManager:
         capture.setdefault("device_model", msg.get("device_model", "unknown"))
         capture.setdefault("captured_at", msg.get("captured_at", ""))
         capture.setdefault("source", "stream")
+        if "exposure_locked" in msg:
+            capture.setdefault("exposure_locked", msg["exposure_locked"])
+        if "white_balance_locked" in msg:
+            capture.setdefault("white_balance_locked", msg["white_balance_locked"])
         # The mirror starts empty; counters are recomputed as frames arrive. Never
         # carry over a stale frame_count from a copied capture (e.g. during --replay).
         capture["frame_count"] = 0
