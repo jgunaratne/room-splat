@@ -23,6 +23,7 @@ enum IngestControl: String, Encodable {
 
 final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     static let pointCloudFrameIndex: UInt32 = 0xFFFF_FFFF
+    static let previewFrameIndex: UInt32 = 0xFFFF_FFFE
     /// Backpressure trigger (SPEC.md §3): above this buffered amount, raise keyframe
     /// thresholds rather than queueing.
     static let backpressureBytes = 8 * 1024 * 1024
@@ -94,6 +95,13 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
 
     func sendPointCloud(_ data: Data) {
         sendBinary(frameIndex: Self.pointCloudFrameIndex, payload: data)
+    }
+
+    /// Low-res preview frame for the viewer PiP. Best-effort: skipped under backpressure
+    /// and never acked, so it never competes with keyframes on a congested link.
+    func sendPreview(_ data: Data) {
+        guard !isBackpressured() else { return }
+        sendBinary(frameIndex: Self.previewFrameIndex, payload: data)
     }
 
     private let queue = DispatchQueue(label: "roomsplat.ingest.client")
