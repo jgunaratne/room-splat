@@ -1,0 +1,357 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0725DCC83544B3B28AAB4793 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9132FABFA83E5056F07AFC6D /* ContentView.swift */; };
+		53B4D2B5E154CDABAC6D24A4 /* ThermalGovernor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCCAE05E765A222274F978F /* ThermalGovernor.swift */; };
+		64B2CA7219DA95CCFBF9B26E /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */; };
+		6DA341287BB118BBA3EF339F /* IngestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AD460081D6294F4F8C1E4B /* IngestClient.swift */; };
+		C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */; };
+		DE8B59679715A57A2191BAFE /* RoomSplatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D898E9AEB2372348F50554AB /* RoomSplatApp.swift */; };
+		E02073CF36815026328D6A5D /* CoordinateTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A12CEBA056FBA87D10F985 /* CoordinateTransform.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		30A12CEBA056FBA87D10F985 /* CoordinateTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoordinateTransform.swift; sourceTree = "<group>"; };
+		3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
+		3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyframeSelector.swift; sourceTree = "<group>"; };
+		3FCCAE05E765A222274F978F /* ThermalGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGovernor.swift; sourceTree = "<group>"; };
+		43518463371D6070F2A683A9 /* RoomSplat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RoomSplat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9132FABFA83E5056F07AFC6D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D898E9AEB2372348F50554AB /* RoomSplatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSplatApp.swift; sourceTree = "<group>"; };
+		E2AD460081D6294F4F8C1E4B /* IngestClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestClient.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		055919B80FC7B9B705E82709 /* RoomSplat */ = {
+			isa = PBXGroup;
+			children = (
+				75BD1D51FE608E61D5F48053 /* App */,
+				1D3ADE29C916A95A5BB7441E /* Capture */,
+				5A09821658C01F0FAC868AD7 /* Governor */,
+				10C8D6D10BBF4059C590D854 /* Stream */,
+			);
+			path = RoomSplat;
+			sourceTree = "<group>";
+		};
+		10C8D6D10BBF4059C590D854 /* Stream */ = {
+			isa = PBXGroup;
+			children = (
+				E2AD460081D6294F4F8C1E4B /* IngestClient.swift */,
+			);
+			path = Stream;
+			sourceTree = "<group>";
+		};
+		1D3ADE29C916A95A5BB7441E /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				30A12CEBA056FBA87D10F985 /* CoordinateTransform.swift */,
+				3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */,
+				3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		307EDD3FCF1A1EEE2143B2C4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				43518463371D6070F2A683A9 /* RoomSplat.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3CE46FF19F47A03F30F7B427 = {
+			isa = PBXGroup;
+			children = (
+				055919B80FC7B9B705E82709 /* RoomSplat */,
+				307EDD3FCF1A1EEE2143B2C4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5A09821658C01F0FAC868AD7 /* Governor */ = {
+			isa = PBXGroup;
+			children = (
+				3FCCAE05E765A222274F978F /* ThermalGovernor.swift */,
+			);
+			path = Governor;
+			sourceTree = "<group>";
+		};
+		75BD1D51FE608E61D5F48053 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				9132FABFA83E5056F07AFC6D /* ContentView.swift */,
+				D898E9AEB2372348F50554AB /* RoomSplatApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DABC247186F836C0FB79E2CC /* RoomSplat */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8473D8447EEB109A46AEF6DC /* Build configuration list for PBXNativeTarget "RoomSplat" */;
+			buildPhases = (
+				BF0817650A1615FAA3FBCB52 /* Sources */,
+				6D58E777B771A0925DB83BAD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RoomSplat;
+			packageProductDependencies = (
+			);
+			productName = RoomSplat;
+			productReference = 43518463371D6070F2A683A9 /* RoomSplat.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B2CA4B19B6D7DEDBD6777540 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = E067263546F0D5B68BAEAF18 /* Build configuration list for PBXProject "RoomSplat" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3CE46FF19F47A03F30F7B427;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 307EDD3FCF1A1EEE2143B2C4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DABC247186F836C0FB79E2CC /* RoomSplat */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6D58E777B771A0925DB83BAD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				64B2CA7219DA95CCFBF9B26E /* THIRD_PARTY_NOTICES.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BF0817650A1615FAA3FBCB52 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0725DCC83544B3B28AAB4793 /* ContentView.swift in Sources */,
+				E02073CF36815026328D6A5D /* CoordinateTransform.swift in Sources */,
+				6DA341287BB118BBA3EF339F /* IngestClient.swift in Sources */,
+				C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */,
+				DE8B59679715A57A2191BAFE /* RoomSplatApp.swift in Sources */,
+				53B4D2B5E154CDABAC6D24A4 /* ThermalGovernor.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		23F4200B7EAFD1143BFFBD4E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "RoomSplat uses the camera and LiDAR to capture the room.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.roomsplat.RoomSplat;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4060A3271A5B8CDD3E3CF7F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		4DC55CA646609419E63E1307 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F45065D3F5CC7C7C6F9FD524 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "RoomSplat uses the camera and LiDAR to capture the room.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.roomsplat.RoomSplat;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8473D8447EEB109A46AEF6DC /* Build configuration list for PBXNativeTarget "RoomSplat" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F45065D3F5CC7C7C6F9FD524 /* Debug */,
+				23F4200B7EAFD1143BFFBD4E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E067263546F0D5B68BAEAF18 /* Build configuration list for PBXProject "RoomSplat" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4DC55CA646609419E63E1307 /* Debug */,
+				4060A3271A5B8CDD3E3CF7F6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B2CA4B19B6D7DEDBD6777540 /* Project object */;
+}
