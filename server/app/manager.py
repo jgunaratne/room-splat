@@ -118,9 +118,18 @@ class SessionManager:
 
     async def add_viewer(self, ws: Any) -> None:
         self.viewers.add(ws)
-        # A late-joining browser gets the full current manifest immediately (§4).
+        # A late-joining browser gets the full current manifest immediately (§4), plus a
+        # room-mesh notice for any session that has one — otherwise a reload restores the
+        # splats (carried in the manifest) but not the LiDAR mesh (announced only when a
+        # fresh frame arrives), so the mesh would vanish until the next capture frame.
         for rt in self.sessions.values():
             await ws.send_text(json.dumps(rt.manifest.snapshot()))
+            if rt.session.room_mesh:
+                await ws.send_text(json.dumps({
+                    "type": "room_mesh",
+                    "session_id": rt.session.session_id,
+                    "version": rt.session.room_mesh_version,
+                }))
 
     def remove_viewer(self, ws: Any) -> None:
         self.viewers.discard(ws)
