@@ -25,7 +25,7 @@
 		3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		3AA0F92BC3C573CFF338C7DB /* KeyframeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyframeSelector.swift; sourceTree = "<group>"; };
 		3FCCAE05E765A222274F978F /* ThermalGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalGovernor.swift; sourceTree = "<group>"; };
-		43518463371D6070F2A683A9 /* RoomSplat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RoomSplat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		43518463371D6070F2A683A9 /* RoomSplat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RoomSplat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCoordinator.swift; sourceTree = "<group>"; };
 		596A59026967C4C01114347E /* BlurScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurScore.swift; sourceTree = "<group>"; };
 		7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointCloudFuser.swift; sourceTree = "<group>"; };
@@ -139,8 +139,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = E067263546F0D5B68BAEAF18 /* Build configuration list for PBXProject "RoomSplat" */;
 			developmentRegion = en;
@@ -198,6 +196,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = HM32H656B6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "RoomSplat uses the camera and LiDAR to capture the room.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "RoomSplat streams captured frames to your local ingest server.";
@@ -341,6 +340,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = HM32H656B6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "RoomSplat uses the camera and LiDAR to capture the room.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "RoomSplat streams captured frames to your local ingest server.";
