@@ -93,6 +93,11 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private var lastCloudKeyframe = 0
     private var cloudSent = false
     private var sessionOpened = false
+    // Stable per-capture id + the exact session_open payload, so a reconnect resends
+    // session_open with the SAME id and the server resumes rather than restarts (§4).
+    private var sessionId = ""
+    private var pendingSessionOpen: [String: Any]?
+    private var latestCloud: Data?
     private var minKeyframeInterval: TimeInterval = 0
     private var lastKeyframeTime: TimeInterval = 0
     private var lastError: String?
@@ -132,6 +137,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
                 self.lastCloudKeyframe = 0
                 self.cloudSent = false
                 self.sessionOpened = false
+                self.sessionId = UUID().uuidString
+                self.pendingSessionOpen = nil
+                self.latestCloud = nil
                 self.lastKeyframeTime = 0
                 self.packageWriter = nil
 
@@ -222,6 +230,15 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private func handleConnection(_ up: Bool) {
         guard isCapturingNow else { return }
         if up { lastError = nil }
+        // On a (re)connect after the session was already opened, re-send session_open
+        // with the same id so the server resumes this session on the new socket, then
+        // reseed the cloud. Without this, frames on the new socket are dropped as
+        // "before session_open" while the UI still shows Transmitting (SPEC.md §4).
+        if up, let payload = pendingSessionOpen, let ingest {
+            ingest.send(control: .sessionOpen, payload: payload)
+            ingest.send(control: .capabilityReport, payload: ["lidar": true, "scene_depth": true])
+            if let cloud = latestCloud { ingest.sendPointCloud(cloud) }
+        }
         let detail = lastError.map { " (\($0))" } ?? ""
         publish {
             switch self.link {
@@ -261,8 +278,8 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         let intr = frame.camera.intrinsics
         let res = frame.camera.imageResolution
         let formatter = ISO8601DateFormatter()
-        ingest.send(control: .sessionOpen, payload: [
-            "session_id": UUID().uuidString,
+        let payload: [String: Any] = [
+            "session_id": sessionId,
             "device_model": UIDevice.current.model,
             "captured_at": formatter.string(from: Date()),
             "exposure_locked": exposureLocked,
@@ -277,7 +294,9 @@ final class CaptureCoordinator: NSObject, ObservableObject {
                 "w": Int(res.width),
                 "h": Int(res.height),
             ],
-        ])
+        ]
+        pendingSessionOpen = payload  // remembered so a reconnect can resume this session
+        ingest.send(control: .sessionOpen, payload: payload)
         ingest.send(control: .capabilityReport, payload: ["lidar": true, "scene_depth": true])
     }
 
@@ -508,7 +527,9 @@ extension CaptureCoordinator: ARSessionDelegate {
     /// trainer from zero points during depth warmup.
     private func sendCloudIfReady(_ ingest: IngestClient, keyframe: Int) {
         guard fuser.count > 0 else { return }
-        ingest.sendPointCloud(fuser.encode())
+        let encoded = fuser.encode()
+        latestCloud = encoded  // kept so a reconnect can reseed the trainer/viewer
+        ingest.sendPointCloud(encoded)
         cloudSent = true
         lastCloudKeyframe = keyframe
         let pc = fuser.count
