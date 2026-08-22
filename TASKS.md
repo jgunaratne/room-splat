@@ -148,9 +148,10 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
 - [x] nginx vhost + deploy script for `sea.octo80.com` — `deploy/` (a136011)
 - [x] Server running + pinned GPU combo — `server/run-server.sh`, `server/README.md` (4abb8b8)
 
-- [ ] **systemd unit** so the server survives reboot (currently a `setsid` process).
+- [x] **systemd unit** so the server survives reboot (currently a `setsid` process).
   *Area:* `deploy/`. *Done when:* `systemctl enable --now roomsplat` keeps it up across a
-  reboot. *Needs sudo.*
+  reboot. `deploy/roomsplat.service`, `deploy/install-service.sh`.
+  — @antigravity, 2026-08-22
 - [x] **CI replay job:** keep ≥ 3 recorded sessions in `fixtures/` and run them through
   `--replay` on every push (SPEC.md §8). *Area:* `.github/workflows/`, `fixtures/`.
   *Done when:* CI is green replaying committed fixtures.
