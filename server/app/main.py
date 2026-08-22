@@ -47,10 +47,17 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
                 msg = await ws.receive()
                 if msg["type"] == "websocket.disconnect":
                     break
-                if (text := msg.get("text")) is not None:
-                    current = await _handle_control(mgr, ws, json.loads(text), current)
-                elif (data := msg.get("bytes")) is not None:
-                    await _handle_binary(mgr, current, data)
+                # The stream is lossy by design (SPEC.md §4): a malformed or
+                # unexpected frame is logged and skipped, never fatal to the socket.
+                try:
+                    if (text := msg.get("text")) is not None:
+                        current = await _handle_control(mgr, ws, json.loads(text), current)
+                    elif (data := msg.get("bytes")) is not None:
+                        await _handle_binary(mgr, current, data)
+                except WebSocketDisconnect:
+                    raise
+                except Exception:
+                    log.exception("ingest frame handling failed (session=%s); dropping frame", current)
         except WebSocketDisconnect:
             pass
         log.info("ingest socket closed (session=%s)", current)

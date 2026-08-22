@@ -26,8 +26,14 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
     /// thresholds rather than queueing.
     static let backpressureBytes = 8 * 1024 * 1024
 
+    /// Ping cadence. Cloudflare (and most proxies) close idle WebSockets after ~100 s;
+    /// keyframes can be sparser than that when the operator holds still, so ping to
+    /// keep the tunnel open.
+    private static let keepaliveInterval: TimeInterval = 30
+
     private let serverURL: URL
     private var task: URLSessionWebSocketTask?
+    private var pingTimer: DispatchSourceTimer?
     private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
 
     private(set) var highestAck: Int = -1
@@ -115,6 +121,7 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
                 self.receiveLoop()
             case .failure(let error):
                 print("ingest receive failed, reconnecting:", error)
+                self.stopKeepalive()
                 self.onConnectionChange?(false)
                 self.reconnect()
             }
@@ -141,11 +148,33 @@ final class IngestClient: NSObject, URLSessionWebSocketDelegate {
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
                     didOpenWithProtocol protocol: String?) {
+        startKeepalive()
         onConnectionChange?(true)
     }
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
                     didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        stopKeepalive()
         onConnectionChange?(false)
+    }
+
+    // MARK: keepalive
+
+    private func startKeepalive() {
+        stopKeepalive()
+        let timer = DispatchSource.makeTimerSource(queue: .global())
+        timer.schedule(deadline: .now() + Self.keepaliveInterval, repeating: Self.keepaliveInterval)
+        timer.setEventHandler { [weak self] in
+            self?.task?.sendPing { error in
+                if let error { print("ingest ping failed:", error) }
+            }
+        }
+        timer.resume()
+        pingTimer = timer
+    }
+
+    private func stopKeepalive() {
+        pingTimer?.cancel()
+        pingTimer = nil
     }
 }
