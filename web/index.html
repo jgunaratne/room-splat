@@ -25,6 +25,19 @@
         padding: 4px 2px 2px; display: flex; justify-content: space-between;
       }
       #pip .live { color: #ff3b30; }
+      #console {
+        position: fixed; bottom: 12px; right: 12px; z-index: 10;
+        width: 340px; height: 170px; background: rgba(12,13,16,.82);
+        border-radius: 8px; padding: 8px 10px; overflow-y: auto;
+        font: 11px/1.45 ui-monospace, monospace; color: #b9c0c8;
+      }
+      #console .hdr { color: #7f8792; margin-bottom: 4px; }
+      #console .line { white-space: pre-wrap; word-break: break-word; }
+      #console .t { color: #5c636d; }
+      #console .info { color: #b9c0c8; }
+      #console .ok { color: #7ddc8f; }
+      #console .warn { color: #ffb454; }
+      #console .dim { color: #6b7280; }
     </style>
   </head>
   <body>
@@ -39,6 +52,7 @@
       <img id="pipImg" alt="live capture" />
       <div class="cap"><span class="live">● LIVE</span><span id="pipFrame"></span></div>
     </div>
+    <div id="console"><div class="hdr">system console</div></div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

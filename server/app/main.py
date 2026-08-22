@@ -158,6 +158,7 @@ async def _handle_binary(mgr: SessionManager, ws: WebSocket, current: str | None
         xyz, rgb = read_point_cloud_bin(payload)
         version = rt.session.on_point_cloud(xyz, rgb)
         rt.on_point_cloud(xyz, rgb, version)
+        await mgr.broadcast_log(f"LiDAR cloud v{version}: {len(xyz):,} points")
     elif is_preview(frame_index):
         # Timer-driven preview: refresh the PiP only. Not mirrored, not trained, not
         # acked (best-effort, so it never competes with keyframes on a congested link).

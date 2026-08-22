@@ -43,5 +43,6 @@ export class PointCloudLayer {
     if (this.points) this.scene.remove(this.points);
     this.points = next;
     this.scene.add(next);
+    return count;
   }
 }
