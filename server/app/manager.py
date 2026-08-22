@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,23 @@ class SessionManager:
 
     def remove_viewer(self, ws: Any) -> None:
         self.viewers.discard(ws)
+
+    async def reset(self) -> None:
+        """Drop all sessions and wipe their on-disk mirrors + assets, then tell viewers
+        to clear. Used by the UI Reset button to start a scene from scratch."""
+        for rt in list(self.sessions.values()):
+            rt.session._complete = True
+            await rt.stop()
+        self.sessions.clear()
+        for base in (self.data_dir, self.assets_dir):
+            for child in base.glob("*"):
+                try:
+                    shutil.rmtree(child) if child.is_dir() else child.unlink()
+                except OSError as e:  # pragma: no cover
+                    log.warning("reset: could not remove %s: %s", child, e)
+        log.info("stage=reset cleared all sessions and assets")
+        await self.broadcast({"type": "reset"})
+        await self.broadcast_log("reset — scene cleared, ready for a new capture", "warn")
 
     async def broadcast_log(self, msg: str, level: str = "info") -> None:
         """Push a concise processing line to the viewer console (bottom-right panel)."""

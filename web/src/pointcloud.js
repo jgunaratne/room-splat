@@ -45,4 +45,15 @@ export class PointCloudLayer {
     this.scene.add(next);
     return count;
   }
+
+  clear() {
+    if (this.points) {
+      this.scene.remove(this.points);
+      this.points.geometry.dispose();
+      this.points.material.dispose();
+      this.points = null;
+    }
+    this.version = -1;
+    this._url = null;
+  }
 }

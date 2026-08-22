@@ -80,7 +80,15 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
         await mgr.add_viewer(ws)
         try:
             while True:
-                await ws.receive_text()  # viewer is a pure consumer; ignore input
+                # The viewer is a pure consumer except for one control: a Reset request,
+                # which drops the current session(s) + assets so a new capture starts
+                # from scratch (server broadcasts "reset" so every viewer clears too).
+                text = await ws.receive_text()
+                try:
+                    if json.loads(text).get("type") == "reset":
+                        await mgr.reset()
+                except (ValueError, AttributeError):
+                    pass
         except WebSocketDisconnect:
             pass
         finally:

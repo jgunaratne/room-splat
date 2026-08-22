@@ -21,9 +21,16 @@ export class LiveFrustum {
     return new THREE.Mesh(g, m);
   }
 
+  clear() {
+    this.trailPositions = [];
+    this.trail.geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(0), 3));
+    this.frustum.visible = false;
+  }
+
   // pose is a 4x4 camera-to-world, row-major (as sent on the wire).
   update(pose) {
     if (!pose) return;
+    this.frustum.visible = true;
     const m = new THREE.Matrix4();
     // row-major -> THREE column-major set(): pass row by row.
     m.set(

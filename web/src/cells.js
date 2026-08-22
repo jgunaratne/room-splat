@@ -93,4 +93,12 @@ export class CellManager {
   }
 
   get count() { return this.slots.size; }
+
+  clear() {
+    for (const slot of this.slots.values()) {
+      if (slot.mesh) { this.scene.remove(slot.mesh); slot.mesh.dispose?.(); }
+    }
+    this.slots.clear();
+    this._active = 0;
+  }
 }

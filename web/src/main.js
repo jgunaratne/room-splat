@@ -83,6 +83,28 @@ coverageBtn.onclick = () => {
   coverage.setEnabled(coverageOn);
   coverageBtn.textContent = `coverage: ${coverageOn ? "on" : "off"}`;
 };
+
+let viewerWs = null;
+document.getElementById("reset").onclick = () => {
+  // Ask the server to drop the current session + assets; it broadcasts "reset" back,
+  // which clears every connected viewer (including this one) via clearScene().
+  viewerWs?.send(JSON.stringify({ type: "reset" }));
+  logLine("reset requested…", "warn");
+};
+
+function clearScene() {
+  cells.clear();
+  cloud.clear();
+  coverage.clear();
+  frustum.clear();
+  cellSize = null;
+  lastCloudUrl = null;
+  followTarget = null;
+  hidePip();
+  setMode("follow");
+  countsEl.textContent = "";
+  logLine("scene reset — ready for a new capture", "ok");
+}
 function setMode(m) {
   mode = m;
   controls.enabled = m === "free";
@@ -172,6 +194,7 @@ function onManifest(msg) {
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/viewer`);
+  viewerWs = ws;
   ws.onopen = () => {
     statusEl.textContent = "live";
     logLine("connected to server", "ok");
@@ -184,7 +207,9 @@ function connect() {
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "manifest_update") onManifest(msg);
-    else if (msg.type === "log") {
+    else if (msg.type === "reset") {
+      clearScene();
+    } else if (msg.type === "log") {
       logLine(msg.msg, msg.level === "warn" ? "warn" : "info");
     } else if (msg.type === "live_pose") {
       const t = frustum.update(msg.pose);

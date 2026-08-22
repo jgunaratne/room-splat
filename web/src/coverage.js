@@ -71,4 +71,12 @@ export class CoverageLayer {
   get count() {
     return this.boxes.size;
   }
+
+  clear() {
+    for (const box of this.boxes.values()) {
+      this.scene.remove(box);
+      box.material.dispose();
+    }
+    this.boxes.clear();
+  }
 }
