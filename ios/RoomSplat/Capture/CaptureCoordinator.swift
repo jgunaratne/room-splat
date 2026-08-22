@@ -83,6 +83,11 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
     private let jpegColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     private static let jpegLongEdge: CGFloat = 1600  // SPEC.md §6
+    // Live preview for the viewer PiP: small + frequent, independent of the keyframe gate
+    // so the PiP stays responsive even when the operator holds still.
+    private static let previewLongEdge: CGFloat = 640
+    private static let previewInterval: TimeInterval = 0.25  // ~4 fps
+    private var lastPreviewTime: TimeInterval = 0
 
     // Camera locks (SPEC.md §3): lock exposure + white balance, fixed focus pre-session.
     // Assert every frame; record a warning in session metadata if any lock is lost.
@@ -360,6 +365,21 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         return ciContext.jpegRepresentation(of: image, colorSpace: jpegColorSpace, options: options)
     }
 
+    /// Small, low-quality JPEG for the live PiP (not a training keyframe): 640 px long
+    /// edge at q0.5, so ~4 fps costs little bandwidth.
+    private func previewJpeg(from pixelBuffer: CVPixelBuffer) -> Data? {
+        var image = CIImage(cvPixelBuffer: pixelBuffer)
+        let longEdge = max(image.extent.width, image.extent.height)
+        if longEdge > Self.previewLongEdge {
+            let s = Self.previewLongEdge / longEdge
+            image = image.transformed(by: CGAffineTransform(scaleX: s, y: s))
+        }
+        let options: [CIImageRepresentationOption: Any] = [
+            CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.5
+        ]
+        return ciContext.jpegRepresentation(of: image, colorSpace: jpegColorSpace, options: options)
+    }
+
     private func setStatus(_ text: String) { publish { self.status = text } }
 
     // MARK: - camera configuration & lock assertion (SPEC.md §3)
@@ -484,6 +504,15 @@ extension CaptureCoordinator: ARSessionDelegate {
             fuser.integrate(frame: frame)
             // sceneDepth is often nil during ARKit warmup; only send a non-empty seed.
             sendCloudIfReady(ingest, keyframe: 0)
+        }
+
+        // Live preview on its own cadence, BEFORE the movement-gated keyframe checks, so
+        // the viewer PiP stays responsive even when the operator holds still.
+        if frame.timestamp - lastPreviewTime >= Self.previewInterval {
+            lastPreviewTime = frame.timestamp
+            if let preview = previewJpeg(from: frame.capturedImage) {
+                ingest.sendPreview(preview)
+            }
         }
 
         if minKeyframeInterval > 0, frame.timestamp - lastKeyframeTime < minKeyframeInterval {

@@ -45,6 +45,9 @@ class LiveSession:
         # picture-in-picture of what the phone is scanning right now.
         self.latest_jpeg: bytes | None = None
         self.latest_frame_index: int = -1
+        # Monotonic counter bumped by every image OR preview frame; the viewer uses it to
+        # cache-bust the /live PiP so it refreshes whenever a newer frame arrives.
+        self.live_seq: int = 0
         self.point_cloud_version = 0
         self.point_cloud: tuple[np.ndarray, np.ndarray] | None = None
         # frame_index -> pose, populated by keyframe_meta and consumed by the image
@@ -94,11 +97,18 @@ class LiveSession:
         file_path = self.package.append_keyframe(frame_index, jpeg, meta.transform_matrix)
         self.latest_jpeg = jpeg
         self.latest_frame_index = frame_index
+        self.live_seq += 1
         self._written.add(frame_index)
         self.stats.frame_count += 1
         self._highest_ack = max(self._highest_ack, frame_index)
         self.package.update_capture(frame_count=self.stats.frame_count)
         return file_path
+
+    def on_preview(self, jpeg: bytes) -> int:
+        """A low-res preview frame: update the PiP image only (no disk, no training)."""
+        self.latest_jpeg = jpeg
+        self.live_seq += 1
+        return self.live_seq
 
     def on_point_cloud(self, xyz: np.ndarray, rgb: np.ndarray) -> int:
         """Store and mirror the fused LiDAR cloud; bump its version (§3, resent every 50 kf)."""

@@ -21,6 +21,7 @@ from roomsplat.protocol import (
     KeyframeMeta,
     decode_binary,
     is_point_cloud,
+    is_preview,
 )
 from train.export import read_point_cloud_bin
 
@@ -157,6 +158,13 @@ async def _handle_binary(mgr: SessionManager, ws: WebSocket, current: str | None
         xyz, rgb = read_point_cloud_bin(payload)
         version = rt.session.on_point_cloud(xyz, rgb)
         rt.on_point_cloud(xyz, rgb, version)
+    elif is_preview(frame_index):
+        # Timer-driven preview: refresh the PiP only. Not mirrored, not trained, not
+        # acked (best-effort, so it never competes with keyframes on a congested link).
+        seq = rt.session.on_preview(payload)
+        await mgr.broadcast({
+            "type": "live_frame", "session_id": rt.session.session_id, "frame_index": seq,
+        })
     else:
         if rt.session.on_image(frame_index, payload) is not None:
             rt.on_image()
@@ -165,7 +173,7 @@ async def _handle_binary(mgr: SessionManager, ws: WebSocket, current: str | None
             await mgr.broadcast({
                 "type": "live_frame",
                 "session_id": rt.session.session_id,
-                "frame_index": frame_index,
+                "frame_index": rt.session.live_seq,
             })
         # Ack every image that is now durably on disk. The client advances its resume
         # point to this index; capture is never blocked on the ack (SPEC.md §4).

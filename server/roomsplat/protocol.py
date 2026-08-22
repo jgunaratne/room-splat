@@ -34,6 +34,10 @@ class ControlType(str, Enum):
 
 # frame_index sentinel for the fused LiDAR cloud binary frame (not an image).
 POINT_CLOUD_FRAME_INDEX = 0xFFFFFFFF
+# frame_index sentinel for a low-res live preview frame: shown in the viewer PiP but
+# never mirrored to disk, counted as a keyframe, or trained on. Sent on a timer so the
+# PiP stays responsive even when the operator holds still (keyframes are movement-gated).
+PREVIEW_FRAME_INDEX = 0xFFFFFFFE
 
 
 def encode_binary(frame_index: int, payload: bytes) -> bytes:
@@ -49,6 +53,10 @@ def decode_binary(data: bytes) -> tuple[int, bytes]:
 
 def is_point_cloud(frame_index: int) -> bool:
     return frame_index == POINT_CLOUD_FRAME_INDEX
+
+
+def is_preview(frame_index: int) -> bool:
+    return frame_index == PREVIEW_FRAME_INDEX
 
 
 @dataclass
