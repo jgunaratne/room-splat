@@ -32,13 +32,42 @@ struct ContentView: View {
                 .fill(linkColor)
                 .frame(width: 10, height: 10)
             Text(coordinator.status)
+                .lineLimit(1)
             Spacer()
+            lidarIndicator
             Text(thermalLabel)
         }
         .font(.footnote.weight(.medium))
         .foregroundStyle(.white)
         .padding(8)
         .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var lidarIndicator: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "wave.3.right.circle.fill")
+            Text(lidarLabel)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(lidarColor)
+        .help("LiDAR depth sensor status")
+    }
+
+    private var lidarLabel: String {
+        guard CaptureCoordinator.deviceSupported else { return "No LiDAR" }
+        if coordinator.isCapturing {
+            guard coordinator.lidarActive else { return "LiDAR warming" }
+            return coordinator.meshAnchorCount > 0 ? "LiDAR \(coordinator.meshAnchorCount)" : "LiDAR"
+        }
+        return "LiDAR ready"
+    }
+
+    private var lidarColor: Color {
+        guard CaptureCoordinator.deviceSupported else { return .gray }
+        if coordinator.isCapturing {
+            return coordinator.lidarActive ? .green : .orange
+        }
+        return .white.opacity(0.6)
     }
 
     private var linkColor: Color {

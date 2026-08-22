@@ -35,6 +35,10 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     @Published private(set) var link: Link = .offline
     @Published private(set) var thermalState: ProcessInfo.ThermalState = .nominal
     @Published private(set) var status = "Idle"
+    /// True while ARKit is delivering LiDAR sceneDepth on the current frames.
+    @Published private(set) var lidarActive = false
+    /// Number of ARKit scene-reconstruction mesh anchors captured so far.
+    @Published private(set) var meshAnchorCount = 0
     @Published var serverHost: String {
         didSet { UserDefaults.standard.set(serverHost, forKey: "serverHost") }
     }
@@ -96,6 +100,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private var orientationObserver: NSObjectProtocol?
     // ARKit scene-reconstruction mesh anchors, streamed to the viewer's LiDAR tab.
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
+    private var lidarActiveInternal = false
     private var lastMeshTime: TimeInterval = 0
     private static let meshInterval: TimeInterval = 3.0
 
@@ -281,11 +286,13 @@ final class CaptureCoordinator: NSObject, ObservableObject {
                 }
                 self.packageWriter = nil
             }
+            self.lidarActiveInternal = false
         }
         publish {
             self.isCapturing = false
             self.link = .offline
             self.status = "Stopped"
+            self.lidarActive = false
         }
     }
 
@@ -541,6 +548,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
 
 extension CaptureCoordinator: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        updateLidarState(frame)
         // Assert camera locks every frame (SPEC.md §3): exposure, WB, fixed focus
         assertCameraLocks()
 
@@ -667,11 +675,27 @@ extension CaptureCoordinator: ARSessionDelegate {
     // callbacks run on the same background queue as didUpdate, so mutation is serial.
     func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
         for case let m as ARMeshAnchor in anchors { meshAnchors[m.identifier] = m }
+        publishMeshCount()
     }
     func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
         for case let m as ARMeshAnchor in anchors { meshAnchors[m.identifier] = m }
+        publishMeshCount()
     }
     func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
         for case let m as ARMeshAnchor in anchors { meshAnchors.removeValue(forKey: m.identifier) }
+        publishMeshCount()
+    }
+
+    /// Publish LiDAR liveness only when it flips, not every frame.
+    private func updateLidarState(_ frame: ARFrame) {
+        let active = frame.sceneDepth != nil
+        guard active != lidarActiveInternal else { return }
+        lidarActiveInternal = active
+        publish { self.lidarActive = active }
+    }
+
+    private func publishMeshCount() {
+        let count = meshAnchors.count
+        publish { self.meshAnchorCount = count }
     }
 }
