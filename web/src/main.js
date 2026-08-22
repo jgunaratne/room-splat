@@ -49,6 +49,17 @@ function setMode(m) {
 }
 setMode("follow");
 
+// Follow mode locks the camera onto the operator, so orbit is disabled while a session
+// streams. Let any interaction take control immediately (switch to free) so the scene
+// is inspectable during generation; the button toggles back to follow.
+for (const evName of ["pointerdown", "wheel", "touchstart"]) {
+  renderer.domElement.addEventListener(
+    evName,
+    () => { if (mode === "follow") setMode("free"); },
+    { passive: true },
+  );
+}
+
 let followTarget = null;
 
 // Picture-in-picture of the phone's latest keyframe (top-right). The WS only notifies;
