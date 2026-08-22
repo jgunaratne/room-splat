@@ -104,26 +104,15 @@ class ProgressiveTrainer:
             cov[cell.id] = int(np.count_nonzero(in_range & in_front))
         return cov
 
-    def tick(self, iters: int = 200) -> dict:
-        """Advance training and export dirty cells. Returns a manifest diff dict.
-
-        Emits one structured line per stage with wall-clock duration (SPEC.md §8): you
-        cannot optimize M6 without this history.
-        """
+    def _export(self, cells, stage: str) -> dict:
+        """Export the given cells at the current model state; return a manifest diff."""
         t = time.monotonic()
-        self.backend.step(iters)
-        train_s = time.monotonic() - t
-
-        t = time.monotonic()
-        self._score_dirty()
-        self.manifest.coverage = self._coverage()
-        selected = self.chunker.select_for_export(EXPORT_BUDGET_BYTES)
         cloud = self.backend.cloud()
         idx = self.chunker.assign(cloud.means)
         keys = np.array([f"{a}_{b}_{c}" for a, b, c in idx])
         changed: list[CellEntry] = []
         exported_bytes = 0
-        for cell in selected:
+        for cell in cells:
             mask = keys == f"{cell.index[0]}_{cell.index[1]}_{cell.index[2]}"
             cell.splats = int(np.count_nonzero(mask))
             if cell.splats == 0:
@@ -133,14 +122,45 @@ class ProgressiveTrainer:
             name = entry.url.rsplit("/", 1)[-1]
             exported_bytes += export_cell_ply(self.assets_dir / "cells" / name, cloud.subset(mask))
             changed.append(entry)
-        export_s = time.monotonic() - t
-        self._last_tick = time.monotonic()
         log.info(
-            "stage=train session=%s iters=%d splats=%d wall_s=%.2f",
-            self.manifest.session_id, iters, len(cloud), train_s,
-        )
-        log.info(
-            "stage=export session=%s tick=%d cells=%d bytes=%d wall_s=%.2f",
-            self.manifest.session_id, self.manifest.tick + 1, len(changed), exported_bytes, export_s,
+            "stage=%s session=%s tick=%d cells=%d bytes=%d wall_s=%.2f",
+            stage, self.manifest.session_id, self.manifest.tick + 1, len(changed),
+            exported_bytes, time.monotonic() - t,
         )
         return self.manifest.diff(changed)
+
+    def tick(self, iters: int = 200) -> dict:
+        """Advance training and export the dirtiest cells under budget (SPEC.md §4).
+
+        Emits one structured line per stage with wall-clock duration (SPEC.md §8): you
+        cannot optimize M6 without this history.
+        """
+        t = time.monotonic()
+        self.backend.step(iters)
+        log.info("stage=train session=%s iters=%d splats=%d wall_s=%.2f",
+                 self.manifest.session_id, iters, len(self.backend.cloud()), time.monotonic() - t)
+        self._score_dirty()
+        self.manifest.coverage = self._coverage()
+        self._last_tick = time.monotonic()
+        return self._export(self.chunker.select_for_export(EXPORT_BUDGET_BYTES), stage="export")
+
+    def finish(self, iters: int, max_seconds: float = 60.0) -> dict:
+        """Finishing pass on session end (SPEC.md M6): train much longer, then re-export
+        EVERY occupied cell at final quality (ignoring the per-tick budget). The live
+        walkthrough only accumulates a few hundred iterations per region, so this is what
+        turns the preview into the deliverable.
+
+        Bounded by a wall-clock budget as well as an iteration target, so it can't run
+        for minutes on full-resolution frames and blow the M6 latency target.
+        """
+        t = time.monotonic()
+        done = 0
+        batch = 200
+        while done < iters and (time.monotonic() - t) < max_seconds:
+            self.backend.step(min(batch, iters - done))
+            done += batch
+        log.info("stage=finish_train session=%s iters=%d splats=%d wall_s=%.1f",
+                 self.manifest.session_id, done, len(self.backend.cloud()), time.monotonic() - t)
+        self._score_dirty()
+        self.manifest.coverage = self._coverage()
+        return self._export(list(self.chunker.cells.values()), stage="finish_export")
