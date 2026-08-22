@@ -42,6 +42,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
 
     private var frameIndex = 0
     private var lastCloudKeyframe = 0
+    private var cloudSent = false
     private var sessionOpened = false
     private var minKeyframeInterval: TimeInterval = 0
     private var lastKeyframeTime: TimeInterval = 0
@@ -62,9 +63,12 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     }
 
     func start() {
-        guard !serverHost.isEmpty else { setStatus("Enter a server host first"); return }
+        let host = serverHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !host.isEmpty else { setStatus("Enter a server host first"); return }
         guard Self.deviceSupported else { setStatus("No LiDAR / sceneDepth on this device"); return }
-        guard let arSession, let url = URL(string: "ws://\(serverHost)") else {
+        // Honor an explicit scheme (wss:// for TLS endpoints); default bare hosts to ws://.
+        let urlString = host.contains("://") ? host : "ws://\(host)"
+        guard let arSession, let url = URL(string: urlString) else {
             setStatus("Bad server host"); return
         }
 
@@ -73,6 +77,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
             self.fuser.reset()
             self.frameIndex = 0
             self.lastCloudKeyframe = 0
+            self.cloudSent = false
             self.sessionOpened = false
             self.lastKeyframeTime = 0
 
@@ -210,9 +215,8 @@ extension CaptureCoordinator: ARSessionDelegate {
             openSession(with: frame, ingest: ingest)
             sessionOpened = true
             fuser.integrate(frame: frame)
-            ingest.sendPointCloud(fuser.encode())
-            let pc = fuser.count
-            publish { self.pointCount = pc }
+            // sceneDepth is often nil during ARKit warmup; only send a non-empty seed.
+            sendCloudIfReady(ingest, keyframe: 0)
         }
 
         if minKeyframeInterval > 0, frame.timestamp - lastKeyframeTime < minKeyframeInterval {
@@ -231,9 +235,9 @@ extension CaptureCoordinator: ARSessionDelegate {
 
         fuser.integrate(frame: frame)
         let accepted = selector.acceptedCount
-        if accepted - lastCloudKeyframe >= 50 {
-            lastCloudKeyframe = accepted
-            ingest.sendPointCloud(fuser.encode())
+        // Send the seed as soon as it has points, then resend every 50 keyframes (§3).
+        if !cloudSent || accepted - lastCloudKeyframe >= 50 {
+            sendCloudIfReady(ingest, keyframe: accepted)
         }
 
         let pc = fuser.count
@@ -241,6 +245,17 @@ extension CaptureCoordinator: ARSessionDelegate {
             self.keyframeCount = accepted
             self.pointCount = pc
         }
+    }
+
+    /// Send the fused cloud only when it is non-empty, so the server never seeds a
+    /// trainer from zero points during depth warmup.
+    private func sendCloudIfReady(_ ingest: IngestClient, keyframe: Int) {
+        guard fuser.count > 0 else { return }
+        ingest.sendPointCloud(fuser.encode())
+        cloudSent = true
+        lastCloudKeyframe = keyframe
+        let pc = fuser.count
+        publish { self.pointCount = pc }
     }
 
     func session(_ session: ARSession, didFailWithError error: Error) {
