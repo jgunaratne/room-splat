@@ -107,7 +107,11 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private var meshVisualizer: MeshVisualizer?
     private var lidarActiveInternal = false
     private var lastMeshTime: TimeInterval = 0
-    private static let meshInterval: TimeInterval = 3.0
+    // Send the room mesh as soon as ARKit changes it (meshDirty), throttled to at most
+    // once per meshMinInterval so a growing room doesn't flood the link. This keeps the
+    // web LiDAR view in step with what the phone is drawing instead of ~3 s behind.
+    private var meshDirty = true
+    private static let meshMinInterval: TimeInterval = 0.75
 
     // Camera locks (SPEC.md §3): lock exposure + white balance, fixed focus pre-session.
     // Assert every frame; record a warning in session metadata if any lock is lost.
@@ -174,6 +178,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
                 self.lastKeyframeTime = 0
                 self.meshAnchors = [:]
                 self.lastMeshTime = 0
+                self.meshDirty = true
                 self.packageWriter = nil
 
                 let client = IngestClient(serverURL: url)
@@ -586,9 +591,11 @@ extension CaptureCoordinator: ARSessionDelegate {
             }
         }
 
-        // Stream the ARKit room mesh on its own cadence for the viewer's LiDAR tab.
-        if !meshAnchors.isEmpty, frame.timestamp - lastMeshTime >= Self.meshInterval {
+        // Stream the ARKit room mesh whenever it changed, throttled, so the web LiDAR view
+        // tracks what the phone is drawing rather than lagging a fixed 3 s behind.
+        if meshDirty, !meshAnchors.isEmpty, frame.timestamp - lastMeshTime >= Self.meshMinInterval {
             lastMeshTime = frame.timestamp
+            meshDirty = false
             if let mesh = RoomMeshEncoder.encode(Array(meshAnchors.values)) {
                 ingest.sendRoomMesh(mesh)
             }
@@ -686,6 +693,7 @@ extension CaptureCoordinator: ARSessionDelegate {
         for case let m as ARMeshAnchor in anchors {
             meshAnchors[m.identifier] = m
             meshVisualizer?.update(m)
+            meshDirty = true
         }
         publishMeshCount()
     }
@@ -693,6 +701,7 @@ extension CaptureCoordinator: ARSessionDelegate {
         for case let m as ARMeshAnchor in anchors {
             meshAnchors[m.identifier] = m
             meshVisualizer?.update(m)
+            meshDirty = true
         }
         publishMeshCount()
     }
@@ -700,6 +709,7 @@ extension CaptureCoordinator: ARSessionDelegate {
         for case let m as ARMeshAnchor in anchors {
             meshAnchors.removeValue(forKey: m.identifier)
             meshVisualizer?.remove(m.identifier)
+            meshDirty = true
         }
         publishMeshCount()
     }
