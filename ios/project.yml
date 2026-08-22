@@ -28,6 +28,13 @@ targets:
         UILaunchScreen: {}
         NSCameraUsageDescription: "RoomSplat uses the camera and LiDAR to capture the room."
         NSLocalNetworkUsageDescription: "RoomSplat streams captured frames to your local ingest server."
+        # mDNS / Bonjour discovery of RoomSplat ingest servers on the local subnet.
+        NSBonjourServices:
+          - _roomsplat._tcp
+          - _http._tcp
+        # Expose recorded .roomsplat debug packages via Files / iTunes file sharing.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
