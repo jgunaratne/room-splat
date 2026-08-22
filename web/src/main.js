@@ -119,9 +119,11 @@ function setTab(t) {
   const splat = t === "splat";
   cells.setVisible(splat);
   coverage.setEnabled(splat && coverageOn);
-  // The LiDAR wireframe stays visible in both tabs: on the splat tab it is a live
-  // scaffold that the splats fill in; on the LiDAR tab it is the room itself.
+  // The LiDAR mesh stays visible in both tabs: on the splat tab it is a live wireframe
+  // scaffold the splats fill in; on the LiDAR tab it is the room, shaded with the
+  // camera-sampled polygon colors.
   roomMesh.setVisible(true);
+  roomMesh.setColored(!splat);
   // In LiDAR mode the point cloud IS the room, so make it denser-looking; in splat mode
   // it's just the under-layer, kept fine.
   cloud.setPointSize(splat ? 0.015 : 0.03);

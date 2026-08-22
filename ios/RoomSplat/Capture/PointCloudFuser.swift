@@ -128,6 +128,30 @@ final class PointCloudFuser {
         }
     }
 
+    /// Camera-sampled color for a world-space point, from the fused voxel grid: the voxel
+    /// containing the point, else the nearest occupied voxel in the surrounding 3x3x3
+    /// shell (mesh vertices lie on measured surfaces, so the exact cell usually exists).
+    /// Returns nil when nothing has been observed nearby. Called on the capture queue,
+    /// same as integrate(), so voxel access stays serial.
+    func color(atWorld p: SIMD3<Float>) -> SIMD3<UInt8>? {
+        let inv = 1 / voxelSize
+        let key = SIMD3<Int32>(Int32((p.x * inv).rounded(.down)),
+                               Int32((p.y * inv).rounded(.down)),
+                               Int32((p.z * inv).rounded(.down)))
+        if let vp = voxels[key] { return vp.color }
+        for dz in Int32(-1)...1 {
+            for dy in Int32(-1)...1 {
+                for dx in Int32(-1)...1 {
+                    if dx == 0, dy == 0, dz == 0 { continue }
+                    if let vp = voxels[SIMD3<Int32>(key.x + dx, key.y + dy, key.z + dz)] {
+                        return vp.color
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
     /// Encode the current cloud in the little-endian wire format (device is little-endian).
     func encode() -> Data {
         var data = Data()
