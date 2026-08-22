@@ -24,5 +24,23 @@ one and add these files to its target).
 - Coverage analysis overlay (M5).
 - `Views/`, settings (server host, mDNS discovery, §7).
 
+## App Transport Security (ATS)
+
+The public endpoint `wss://sea.octo80.com` uses Cloudflare's TLS 1.3 + a
+publicly-trusted cert, so it satisfies ATS with no Info.plist changes. A bare host
+now defaults to `wss://` (see `CaptureCoordinator.normalizeWebSocketURL`); only local
+hosts (loopback, `.local`, RFC1918, Tailscale 100.64/10) fall back to cleartext
+`ws://`. **Follow-up for the iOS-project owner:** to let those local `ws://` endpoints
+connect, add to the app's ATS config (the project currently uses
+`GENERATE_INFOPLIST_FILE`, so switch to a custom Info.plist or xcodegen `info:` block):
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict><key>NSAllowsLocalNetworking</key><true/></dict>
+```
+
+(NSAllowsLocalNetworking covers LAN/.local; Tailscale CGNAT may still need a per-domain
+exception or a TLS endpoint on the tailnet.)
+
 Fork these from `vendor/ios-gaussian-splatting-demo/3DGS Demo/` (Capture, Training,
 Viewer) per SPEC.md M1/M5, preserving attribution.
