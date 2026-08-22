@@ -76,8 +76,38 @@ function hidePip() {
   pipEl.style.display = "none";
 }
 
+// Bottom-right system console: shows what the pipeline is doing. Fed by server "log"
+// messages (session/train/export/finish) plus client-side events (connection, cell
+// loads, point-cloud/pose updates). Capped so it can't grow unbounded.
+const consoleEl = document.getElementById("console");
+const MAX_LOG_LINES = 120;
+function logLine(msg, level = "info") {
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);
+  const line = document.createElement("div");
+  line.className = "line";
+  line.innerHTML = `<span class="t">${ts}</span> <span class="${level}">${escapeHtml(msg)}</span>`;
+  consoleEl.appendChild(line);
+  while (consoleEl.querySelectorAll(".line").length > MAX_LOG_LINES) {
+    consoleEl.querySelector(".line").remove();
+  }
+  const atBottom = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 40;
+  if (atBottom) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
+let lastCloudUrl = null;
 function onManifest(msg) {
-  if (msg.point_cloud_url) cloud.update(msg.point_cloud_url);
+  if (msg.point_cloud_url) {
+    if (msg.point_cloud_url !== lastCloudUrl) {
+      lastCloudUrl = msg.point_cloud_url;
+      cloud.update(msg.point_cloud_url).then((n) => {
+        if (n) logLine(`rendered point cloud (${n.toLocaleString()} pts)`);
+      });
+    }
+  }
   if (msg.cells?.length) {
     cells.applyManifest(msg.cells);
     // Infer cell size once from a trained cell's bounds so the coverage layer can box
@@ -101,26 +131,34 @@ function onManifest(msg) {
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/viewer`);
-  ws.onopen = () => (statusEl.textContent = "live");
+  ws.onopen = () => {
+    statusEl.textContent = "live";
+    logLine("connected to server", "ok");
+  };
   ws.onclose = () => {
     statusEl.textContent = "reconnecting…";
+    logLine("disconnected — reconnecting…", "warn");
     setTimeout(connect, 1000);
   };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "manifest_update") onManifest(msg);
-    else if (msg.type === "live_pose") {
+    else if (msg.type === "log") {
+      logLine(msg.msg, msg.level === "warn" ? "warn" : "info");
+    } else if (msg.type === "live_pose") {
       const t = frustum.update(msg.pose);
       if (t) followTarget = t;
     } else if (msg.type === "live_frame") {
       showPip(msg.session_id, msg.frame_index);
     } else if (msg.type === "session_complete") {
       statusEl.textContent = "session complete";
+      logLine("session complete — camera unlocked", "ok");
       setMode("free");
       hidePip();
     }
   };
 }
+logLine("viewer ready", "dim");
 connect();
 
 addEventListener("resize", () => {

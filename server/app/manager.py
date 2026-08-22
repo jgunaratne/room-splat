@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +78,10 @@ class SessionRuntime:
                     continue
                 diff = await asyncio.to_thread(self.trainer.tick)
                 await self.manager.broadcast(diff)
+                n = len(diff.get("cells", []))
+                if n:
+                    await self.manager.broadcast_log(
+                        f"tick {diff.get('tick')}: trained + exported {n} cell(s)")
         except asyncio.CancelledError:
             pass
 
@@ -113,6 +118,10 @@ class SessionManager:
 
     def remove_viewer(self, ws: Any) -> None:
         self.viewers.discard(ws)
+
+    async def broadcast_log(self, msg: str, level: str = "info") -> None:
+        """Push a concise processing line to the viewer console (bottom-right panel)."""
+        await self.broadcast({"type": "log", "t": time.time(), "level": level, "msg": msg})
 
     async def broadcast(self, message: dict) -> None:
         payload = json.dumps(message)
@@ -158,6 +167,7 @@ class SessionManager:
         self.sessions[session_id] = rt
         await rt.start()
         log.info("stage=session_open session=%s root=%s", session_id, root)
+        await self.broadcast_log(f"session {session_id[:8]} opened ({self.backend_name} backend)")
         return rt
 
     async def close_session(self, session_id: str) -> None:
@@ -170,8 +180,11 @@ class SessionManager:
         # every cell at final quality. This is what turns the progressive preview into
         # the deliverable. Runs off the event loop so viewers stay responsive.
         if rt.trainer is not None:
+            await self.broadcast_log(
+                f"finalizing: high-quality pass (up to {self.finish_iters} iters)…", "warn")
             diff = await asyncio.to_thread(rt.trainer.finish, self.finish_iters, self.finish_seconds)
             await self.broadcast(diff)
+            await self.broadcast_log(f"final scene ready: re-exported {len(diff.get('cells', []))} cell(s)")
         await self.broadcast({"type": "session_complete", "session_id": session_id})
         log.info("stage=session_complete session=%s frames=%d",
                  session_id, rt.session.stats.frame_count)
