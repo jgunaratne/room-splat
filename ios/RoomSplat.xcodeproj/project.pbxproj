@@ -13,6 +13,7 @@
 		64B2CA7219DA95CCFBF9B26E /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 3A07EDE3ED6AB575A438FF94 /* THIRD_PARTY_NOTICES.md */; };
 		6DA341287BB118BBA3EF339F /* IngestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AD460081D6294F4F8C1E4B /* IngestClient.swift */; };
 		72B55A2EB22698C9B7E0980E /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CD28A82ED54B2C1712B347 /* CameraPreview.swift */; };
+		8801232459750AF1E4FD9A85 /* MeshVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9A0EF915C6826E2E639603 /* MeshVisualizer.swift */; };
 		9FDCA5DEF97E022CCE1982E8 /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */; };
 		AD8C92DD7EC4A7CE5E5E60E0 /* PointCloudFuser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */; };
 		BC7FA985790D0F8B7A6C3388 /* BlurScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 596A59026967C4C01114347E /* BlurScore.swift */; };
@@ -33,6 +34,7 @@
 		48B5453B7894E20FA4C077A4 /* CaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCoordinator.swift; sourceTree = "<group>"; };
 		596A59026967C4C01114347E /* BlurScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurScore.swift; sourceTree = "<group>"; };
 		6B78383F362518EC05C3D65D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6C9A0EF915C6826E2E639603 /* MeshVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshVisualizer.swift; sourceTree = "<group>"; };
 		7B4A93B4007AE7C088FA018D /* PointCloudFuser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointCloudFuser.swift; sourceTree = "<group>"; };
 		9132FABFA83E5056F07AFC6D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A09A6F7A9CEB630E1C9827C2 /* RoomMeshEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMeshEncoder.swift; sourceTree = "<group>"; };
@@ -47,6 +49,7 @@
 			isa = PBXGroup;
 			children = (
 				F3CD28A82ED54B2C1712B347 /* CameraPreview.swift */,
+				6C9A0EF915C6826E2E639603 /* MeshVisualizer.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -195,6 +198,7 @@
 				E02073CF36815026328D6A5D /* CoordinateTransform.swift in Sources */,
 				6DA341287BB118BBA3EF339F /* IngestClient.swift in Sources */,
 				C6300021DF50842AFDDA28DC /* KeyframeSelector.swift in Sources */,
+				8801232459750AF1E4FD9A85 /* MeshVisualizer.swift in Sources */,
 				D5C248F4A664F1B84E12E271 /* PackageWriter.swift in Sources */,
 				AD8C92DD7EC4A7CE5E5E60E0 /* PointCloudFuser.swift in Sources */,
 				C8AC0766A11AD5287CA1C97F /* RoomMeshEncoder.swift in Sources */,

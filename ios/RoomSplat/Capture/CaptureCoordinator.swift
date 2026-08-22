@@ -39,6 +39,10 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     @Published private(set) var lidarActive = false
     /// Number of ARKit scene-reconstruction mesh anchors captured so far.
     @Published private(set) var meshAnchorCount = 0
+    /// Show the ARKit LiDAR mesh wireframe overlay on the camera preview.
+    @Published var showMesh = true {
+        didSet { meshVisualizer?.isHidden = !showMesh }
+    }
     @Published var serverHost: String {
         didSet { UserDefaults.standard.set(serverHost, forKey: "serverHost") }
     }
@@ -100,6 +104,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private var orientationObserver: NSObjectProtocol?
     // ARKit scene-reconstruction mesh anchors, streamed to the viewer's LiDAR tab.
     private var meshAnchors: [UUID: ARMeshAnchor] = [:]
+    private var meshVisualizer: MeshVisualizer?
     private var lidarActiveInternal = false
     private var lastMeshTime: TimeInterval = 0
     private static let meshInterval: TimeInterval = 3.0
@@ -134,15 +139,18 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         }
     }
 
-    func attach(_ session: ARSession) {
-        arSession = session
-        session.delegate = self
-        session.delegateQueue = queue
+    func attach(_ view: ARSCNView) {
+        arSession = view.session
+        view.session.delegate = self
+        view.session.delegateQueue = queue
+        meshVisualizer = MeshVisualizer(scnView: view)
+        meshVisualizer?.isHidden = !showMesh
     }
 
     func start() {
         guard Self.deviceSupported else { setStatus("No LiDAR / sceneDepth on this device"); return }
         guard let arSession else { setStatus("No ARSession"); return }
+        meshVisualizer?.clear()
 
         if captureMode == .stream {
             let host = serverHost.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -288,6 +296,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
             }
             self.lidarActiveInternal = false
         }
+        meshVisualizer?.clear()
         publish {
             self.isCapturing = false
             self.link = .offline
@@ -674,15 +683,24 @@ extension CaptureCoordinator: ARSessionDelegate {
     // Collect ARKit scene-reconstruction mesh anchors for the LiDAR room view. These
     // callbacks run on the same background queue as didUpdate, so mutation is serial.
     func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
-        for case let m as ARMeshAnchor in anchors { meshAnchors[m.identifier] = m }
+        for case let m as ARMeshAnchor in anchors {
+            meshAnchors[m.identifier] = m
+            meshVisualizer?.update(m)
+        }
         publishMeshCount()
     }
     func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
-        for case let m as ARMeshAnchor in anchors { meshAnchors[m.identifier] = m }
+        for case let m as ARMeshAnchor in anchors {
+            meshAnchors[m.identifier] = m
+            meshVisualizer?.update(m)
+        }
         publishMeshCount()
     }
     func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
-        for case let m as ARMeshAnchor in anchors { meshAnchors.removeValue(forKey: m.identifier) }
+        for case let m as ARMeshAnchor in anchors {
+            meshAnchors.removeValue(forKey: m.identifier)
+            meshVisualizer?.remove(m.identifier)
+        }
         publishMeshCount()
     }
 
