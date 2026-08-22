@@ -53,7 +53,7 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
                     if (text := msg.get("text")) is not None:
                         current = await _handle_control(mgr, ws, json.loads(text), current)
                     elif (data := msg.get("bytes")) is not None:
-                        await _handle_binary(mgr, current, data)
+                        await _handle_binary(mgr, ws, current, data)
                 except WebSocketDisconnect:
                     raise
                 except Exception:
@@ -88,6 +88,9 @@ async def _handle_control(mgr: SessionManager, ws: WebSocket, msg: dict, current
     mtype = msg.get("type")
     if mtype == ControlType.SESSION_OPEN:
         rt = await mgr.open_session(msg)
+        # Tell the client where we are so a reconnect resumes from the next frame; for a
+        # fresh session highest_ack is -1 and the client starts at 0 (SPEC.md §4).
+        await ws.send_text(json.dumps({"type": ControlType.ACK, "frame_index": rt.session.highest_ack}))
         return rt.session.session_id
     rt = mgr.sessions.get(current) if current else None
     if rt is None:
@@ -111,7 +114,7 @@ async def _handle_control(mgr: SessionManager, ws: WebSocket, msg: dict, current
     return current
 
 
-async def _handle_binary(mgr: SessionManager, current: str | None, data: bytes) -> None:
+async def _handle_binary(mgr: SessionManager, ws: WebSocket, current: str | None, data: bytes) -> None:
     rt = mgr.sessions.get(current) if current else None
     if rt is None:
         log.warning("binary frame before session_open")
@@ -124,6 +127,9 @@ async def _handle_binary(mgr: SessionManager, current: str | None, data: bytes) 
     else:
         if rt.session.on_image(frame_index, payload) is not None:
             rt.on_image()
+        # Ack every image that is now durably on disk. The client advances its resume
+        # point to this index; capture is never blocked on the ack (SPEC.md §4).
+        await ws.send_text(json.dumps({"type": ControlType.ACK, "frame_index": frame_index}))
 
 
 app = create_app()
