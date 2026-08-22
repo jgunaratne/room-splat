@@ -28,6 +28,16 @@ from .manager import SessionManager
 
 log = logging.getLogger("roomsplat.app")
 
+# Make our roomsplat.* logs visible: uvicorn only attaches handlers to its own
+# loggers, so per-stage lines (session_open, train, export) would otherwise vanish.
+_rs = logging.getLogger("roomsplat")
+if not _rs.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    _rs.addHandler(_h)
+    _rs.setLevel(logging.INFO)
+    _rs.propagate = False
+
 DATA_DIR = Path(os.environ.get("ROOMSPLAT_DATA", "data/captures"))
 ASSETS_DIR = Path(os.environ.get("ROOMSPLAT_ASSETS", "data/assets"))
 WEB_DIST = Path(os.environ.get("ROOMSPLAT_WEB", "../web/dist"))
