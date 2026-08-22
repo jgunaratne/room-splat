@@ -113,10 +113,11 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[b]` blocked (note why
   record a warning in session metadata if a lock is lost. *Area:* `Capture/`. *Done when:*
   locks are applied pre-session and `tracking_warnings` records losses.
   — @antigravity, 2026-08-22
-- [ ] **Debug record-to-disk `.roomsplat` writer (M1 gate).** Writes the §6 package with
+- [x] **Debug record-to-disk `.roomsplat` writer (M1 gate).** Writes the §6 package with
   no network, exportable via the Files app. *Area:* new `Capture/PackageWriter.swift`.
   *Done when:* the package validates against `roomsplat/package.py` and `points3D.ply`
   opens in MeshLab as a recognizable room. **This unblocks Track A M2.**
+  — @antigravity, 2026-08-22
 - [ ] **Reconnect resume + real backpressure.** Resume from highest acked `frame_index`;
   raise keyframe thresholds when the socket buffer exceeds 8 MB. *Area:* `Stream/`.
   *Done when:* a dropped wifi association resumes without restarting the walkthrough.

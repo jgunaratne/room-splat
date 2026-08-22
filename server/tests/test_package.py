@@ -41,3 +41,15 @@ def test_ply_binary_roundtrip(tmp_path):
     rx, rrgb = read_ply(tmp_path / "p.ply")
     assert np.allclose(rx, xyz, atol=1e-5)
     assert np.array_equal(rrgb, rgb)
+
+
+def test_debug_mode_package_validates(make_package):
+    """Debug mode package written by iOS PackageWriter (M1 gate, SPEC.md §6)."""
+    pkg = make_package(session_id="debug-pkg-uuid", n_frames=5, n_points=1500, source="debug")
+    reopened = RoomSplatPackage.open(pkg.root)
+    reopened.validate()
+    assert reopened.capture["source"] == "debug"
+    assert reopened.capture["frame_count"] == 5
+    assert len(reopened.frames) == 5
+    xyz, rgb = reopened.read_point_cloud()
+    assert xyz.shape == (1500, 3) and rgb.shape == (1500, 3)

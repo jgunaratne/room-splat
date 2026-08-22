@@ -20,6 +20,14 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         case error        // a send failed
     }
 
+    enum CaptureMode: String, CaseIterable, Identifiable {
+        case stream = "Stream"
+        case recordToDisk = "Record to Disk"
+
+        var id: String { rawValue }
+    }
+
+    @Published var captureMode: CaptureMode = .stream
     @Published private(set) var isCapturing = false
     @Published private(set) var keyframeCount = 0
     @Published private(set) var pointCount = 0
@@ -68,6 +76,7 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     private weak var arSession: ARSession?
     private var selector = KeyframeSelector()
     private var ingest: IngestClient?
+    private var packageWriter: PackageWriter?
     private let governor = ThermalGovernor()
     private let fuser = PointCloudFuser()
     private let ciContext = CIContext(options: nil)
@@ -104,43 +113,74 @@ final class CaptureCoordinator: NSObject, ObservableObject {
     }
 
     func start() {
-        let host = serverHost.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !host.isEmpty else { setStatus("Enter a server host first"); return }
         guard Self.deviceSupported else { setStatus("No LiDAR / sceneDepth on this device"); return }
-        // URLSessionWebSocketTask only accepts ws:// or wss:// — normalize a pasted
-        // http(s):// endpoint (e.g. https://sea.octo80.com) to the WebSocket scheme,
-        // and default a bare host to ws://. Trailing slashes are stripped so
-        // appendingPathComponent("ws/ingest") doesn't produce a double slash.
-        let urlString = Self.normalizeWebSocketURL(host)
-        guard let arSession, let url = URL(string: urlString) else {
-            setStatus("Bad server host"); return
-        }
-        print("[capture] starting; server host=\(host) -> \(url.absoluteString)")
+        guard let arSession else { setStatus("No ARSession"); return }
 
-        queue.async {
-            self.selector = KeyframeSelector()
-            self.fuser.reset()
-            self.frameIndex = 0
-            self.lastCloudKeyframe = 0
-            self.cloudSent = false
-            self.sessionOpened = false
-            self.lastKeyframeTime = 0
+        if captureMode == .stream {
+            let host = serverHost.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !host.isEmpty else { setStatus("Enter a server host first"); return }
+            let urlString = Self.normalizeWebSocketURL(host)
+            guard let url = URL(string: urlString) else {
+                setStatus("Bad server host"); return
+            }
+            print("[capture] starting stream; server host=\(host) -> \(url.absoluteString)")
 
-            let client = IngestClient(serverURL: url)
-            client.onBackpressure = { [weak self] in
-                self?.queue.async { self?.selector.escalateForBackpressure() }
+            queue.async {
+                self.selector = KeyframeSelector()
+                self.fuser.reset()
+                self.frameIndex = 0
+                self.lastCloudKeyframe = 0
+                self.cloudSent = false
+                self.sessionOpened = false
+                self.lastKeyframeTime = 0
+                self.packageWriter = nil
+
+                let client = IngestClient(serverURL: url)
+                client.onBackpressure = { [weak self] in
+                    self?.queue.async { self?.selector.escalateForBackpressure() }
+                }
+                client.onConnectionChange = { [weak self] up in
+                    self?.queue.async { self?.handleConnection(up) }
+                }
+                client.onTransmit = { [weak self] ok in
+                    self?.queue.async { self?.handleTransmit(ok) }
+                }
+                client.onError = { [weak self] message in
+                    self?.queue.async { self?.handleError(message) }
+                }
+                client.connect()
+                self.ingest = client
             }
-            client.onConnectionChange = { [weak self] up in
-                self?.queue.async { self?.handleConnection(up) }
+
+            publish {
+                self.keyframeCount = 0
+                self.pointCount = 0
+                self.isCapturing = true
+                self.link = .connecting
+                self.status = "Connecting to \(self.serverHost)…"
             }
-            client.onTransmit = { [weak self] ok in
-                self?.queue.async { self?.handleTransmit(ok) }
+        } else {
+            // Record-to-disk debug mode (SPEC.md M1)
+            print("[capture] starting record-to-disk debug mode")
+            queue.async {
+                self.selector = KeyframeSelector()
+                self.fuser.reset()
+                self.frameIndex = 0
+                self.lastCloudKeyframe = 0
+                self.cloudSent = false
+                self.sessionOpened = false
+                self.lastKeyframeTime = 0
+                self.ingest = nil
+                self.packageWriter = PackageWriter()
             }
-            client.onError = { [weak self] message in
-                self?.queue.async { self?.handleError(message) }
+
+            publish {
+                self.keyframeCount = 0
+                self.pointCount = 0
+                self.isCapturing = true
+                self.link = .offline
+                self.status = "Recording to disk…"
             }
-            client.connect()
-            self.ingest = client
         }
 
         let config = ARWorldTrackingConfiguration()
@@ -149,14 +189,6 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         arSession.run(config, options: [.resetTracking, .removeExistingAnchors])
         applyCameraLocks()
         governor.start()
-
-        publish {
-            self.keyframeCount = 0
-            self.pointCount = 0
-            self.isCapturing = true
-            self.link = .connecting
-            self.status = "Connecting to \(self.serverHost)…"
-        }
     }
 
     func stop() {
@@ -164,8 +196,19 @@ final class CaptureCoordinator: NSObject, ObservableObject {
         unlockCamera()
         governor.stop()
         queue.async {
-            self.ingest?.send(control: .sessionComplete, payload: [:])
-            self.ingest = nil
+            if let ingest = self.ingest {
+                ingest.send(control: .sessionComplete, payload: [:])
+                self.ingest = nil
+            }
+            if let writer = self.packageWriter {
+                do {
+                    try writer.finish(pointCloud: self.fuser.points)
+                    print("[capture] finished writing package to \(writer.packageURL.path)")
+                } catch {
+                    print("[capture] failed to finish package: \(error)")
+                }
+                self.packageWriter = nil
+            }
         }
         publish {
             self.isCapturing = false
@@ -376,8 +419,14 @@ extension CaptureCoordinator: ARSessionDelegate {
         // Assert camera locks every frame (SPEC.md §3): exposure, WB, fixed focus
         assertCameraLocks()
 
-        guard let ingest else { return }
+        if let ingest = self.ingest {
+            handleStreamUpdate(frame: frame, ingest: ingest)
+        } else if let writer = self.packageWriter {
+            handleDiskUpdate(frame: frame, writer: writer)
+        }
+    }
 
+    private func handleStreamUpdate(frame: ARFrame, ingest: IngestClient) {
         if !sessionOpened {
             openSession(with: frame, ingest: ingest)
             sessionOpened = true
@@ -407,6 +456,47 @@ extension CaptureCoordinator: ARSessionDelegate {
             sendCloudIfReady(ingest, keyframe: accepted)
         }
 
+        let pc = fuser.count
+        publish {
+            self.keyframeCount = accepted
+            self.pointCount = pc
+        }
+    }
+
+    private func handleDiskUpdate(frame: ARFrame, writer: PackageWriter) {
+        if !sessionOpened {
+            do {
+                try writer.open(with: frame)
+                writer.exposureLocked = exposureLocked
+                writer.whiteBalanceLocked = whiteBalanceLocked
+                writer.trackingWarnings = trackingWarnings
+                sessionOpened = true
+            } catch {
+                print("[capture] failed to open package writer: \(error)")
+                return
+            }
+        }
+
+        if minKeyframeInterval > 0, frame.timestamp - lastKeyframeTime < minKeyframeInterval {
+            return
+        }
+
+        let blur = BlurScore.laplacianVariance(frame.capturedImage)
+        guard selector.shouldAccept(frame, blurScore: blur) else { return }
+        lastKeyframeTime = frame.timestamp
+
+        guard let jpeg = jpegData(from: frame.capturedImage) else { return }
+        let index = frameIndex
+        frameIndex += 1
+
+        do {
+            try writer.appendKeyframe(index: index, jpegData: jpeg, cameraToWorld: frame.camera.transform)
+        } catch {
+            print("[capture] failed to append keyframe to package: \(error)")
+        }
+
+        fuser.integrate(frame: frame)
+        let accepted = selector.acceptedCount
         let pc = fuser.count
         publish {
             self.keyframeCount = accepted

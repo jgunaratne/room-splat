@@ -79,6 +79,18 @@ final class PointCloudFuser {
         }
     }
 
+    /// Retrieve the current fused points as (position, color) tuples.
+    var points: [(position: SIMD3<Float>, color: SIMD3<UInt8>)] {
+        voxels.map { key, color in
+            let pos = SIMD3<Float>(
+                (Float(key.x) + 0.5) * voxelSize,
+                (Float(key.y) + 0.5) * voxelSize,
+                (Float(key.z) + 0.5) * voxelSize
+            )
+            return (position: pos, color: color)
+        }
+    }
+
     /// Encode the current cloud in the little-endian wire format (device is little-endian).
     func encode() -> Data {
         var data = Data()

@@ -54,12 +54,22 @@ struct ContentView: View {
                 stat("Points", "\(coordinator.pointCount)")
             }
 
-            TextField("server host, e.g. 192.168.1.50:8000", text: $coordinator.serverHost)
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                .disabled(coordinator.isCapturing)
+            Picker("Mode", selection: $coordinator.captureMode) {
+                ForEach(CaptureCoordinator.CaptureMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(coordinator.isCapturing)
+
+            if coordinator.captureMode == .stream {
+                TextField("server host, e.g. 192.168.1.50:8000", text: $coordinator.serverHost)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    .disabled(coordinator.isCapturing)
+            }
 
             Button(action: toggle) {
                 Text(coordinator.isCapturing ? "Stop Capture" : "Start Capture")
